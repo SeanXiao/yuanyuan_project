@@ -61,11 +61,11 @@ function inspirationTextModel() {
 }
 
 function imageModel() {
-  return process.env.BAILIAN_IMAGE_MODEL || "qwen-image-max";
+  return process.env.BAILIAN_IMAGE_MODEL || "wan2.7-image-pro";
 }
 
 function imageSize() {
-  return process.env.BAILIAN_IMAGE_SIZE || "1024*1024";
+  return process.env.BAILIAN_IMAGE_SIZE || "2K";
 }
 
 export function hasBailianKey() {

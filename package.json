@@ -17,13 +17,15 @@
     "lucide-react": "^0.561.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
-    "vite": "^7.2.7"
+    "vite": "^7.2.7",
+    "ws": "^8.21.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^25.0.3",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
+    "@types/ws": "^8.18.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }

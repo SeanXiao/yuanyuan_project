@@ -218,7 +218,7 @@ function stopBrowserSpeech() {
   window.speechSynthesis?.cancel();
 }
 
-async function speakWithServerVoice(text: string, shouldKeepSpeaking: () => boolean) {
+async function speakWithServerVoice(text: string, shouldKeepSpeaking: () => boolean, protagonistGender: ProtagonistGender = "girl") {
   if (Date.now() < serverSpeechRetryAt) {
     throw new Error("Server TTS is cooling down");
   }
@@ -229,7 +229,7 @@ async function speakWithServerVoice(text: string, shouldKeepSpeaking: () => bool
   const response = await fetch("/api/speech", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text })
+    body: JSON.stringify({ text, protagonistGender })
   });
   const data = (await response.json()) as { audioUrl?: string; error?: string };
   if (!response.ok || !data.audioUrl) {
@@ -277,13 +277,17 @@ async function speakWithServerVoice(text: string, shouldKeepSpeaking: () => bool
   return true;
 }
 
-async function speakWithBrowser(text: string, language: BookLanguage = "zh", options?: { shouldContinue?: () => boolean }) {
+async function speakWithBrowser(
+  text: string,
+  language: BookLanguage = "zh",
+  options?: { shouldContinue?: () => boolean; protagonistGender?: ProtagonistGender }
+) {
   stopBrowserSpeech();
   const runId = browserSpeechRunId;
   const shouldKeepSpeaking = () => runId === browserSpeechRunId && (options?.shouldContinue?.() ?? true);
   if (language === "zh") {
     try {
-      await speakWithServerVoice(text, shouldKeepSpeaking);
+      await speakWithServerVoice(text, shouldKeepSpeaking, options?.protagonistGender || "girl");
       return;
     } catch {
       serverSpeechRetryAt = Date.now() + 10 * 60 * 1000;
@@ -1041,7 +1045,14 @@ export default function App() {
               <h2>{activeBook ? softenDisplayText(activeBook.title) : "桂小灵的绘本工坊"}</h2>
             </div>
             <div className="topbar-actions">
-              <button className="secondary-button" type="button" onClick={() => void speakWithBrowser(readText, activeBook?.language || "zh")} disabled={!activeBook}>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() =>
+                  void speakWithBrowser(readText, activeBook?.language || "zh", { protagonistGender: activeBook?.protagonistGender || "girl" })
+                }
+                disabled={!activeBook}
+              >
                 <Volume2 size={18} />
                 朗读绘本
               </button>
@@ -1308,7 +1319,8 @@ function PictureBookPlayer({ book }: { book: PictureBook | null }) {
     setIsAutoPlaying(true);
     try {
       await speakWithBrowser(cleanSpeechPart(softenDisplayText(currentBook.title)), language, {
-        shouldContinue: () => autoPlayRef.current
+        shouldContinue: () => autoPlayRef.current,
+        protagonistGender: currentBook.protagonistGender || "girl"
       });
       for (const [index, item] of pages.entries()) {
         if (!autoPlayRef.current) {
@@ -1320,7 +1332,8 @@ function PictureBookPlayer({ book }: { book: PictureBook | null }) {
           break;
         }
         await speakWithBrowser(buildPageReadText(currentBook, item, includeCultureNote), language, {
-          shouldContinue: () => autoPlayRef.current
+          shouldContinue: () => autoPlayRef.current,
+          protagonistGender: currentBook.protagonistGender || "girl"
         });
         if (!autoPlayRef.current) {
           break;
@@ -1342,7 +1355,9 @@ function PictureBookPlayer({ book }: { book: PictureBook | null }) {
   function readCurrentPage() {
     autoPlayRef.current = false;
     setIsAutoPlaying(false);
-    void speakWithBrowser(buildPageReadText(currentBook, page, includeCultureNote), language);
+    void speakWithBrowser(buildPageReadText(currentBook, page, includeCultureNote), language, {
+      protagonistGender: currentBook.protagonistGender || "girl"
+    });
   }
 
   function goToPage(nextIndex: number) {

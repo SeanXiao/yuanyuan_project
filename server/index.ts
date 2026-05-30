@@ -9,6 +9,7 @@ import {
   generateSeasonalInspirationChips,
   getBailianRuntimeStatus
 } from "./bailian.js";
+import { synthesizeBailianSpeech } from "./bailianTts.js";
 import { deleteBook, getBook, listBookSummaries, saveBook, toBookSummary, updateBook } from "./bookStore.js";
 import { buildSystemPrompt, chatWithMiniMax, synthesizeSpeech, type ChatMessage } from "./minimax.js";
 import { extractMemoriesFromText, loadMemory, rememberFacts } from "./memoryStore.js";
@@ -39,12 +40,13 @@ app.get("/api/bailian/status", (_request, response) => {
 app.post("/api/speech", async (request, response, next) => {
   try {
     const text = String(request.body?.text || "").trim();
+    const protagonistGender = request.body?.protagonistGender === "boy" ? "boy" : "girl";
     if (!text) {
       response.status(400).json({ error: "text is required" });
       return;
     }
 
-    const audio = await synthesizeSpeech(text);
+    const audio = await synthesizeBailianSpeech(text, protagonistGender);
     response.json(audio);
   } catch (error) {
     next(error);
