@@ -1,6 +1,12 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { access, mkdir, stat, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
 import type { ProtagonistGender } from "./bookStore.js";
+
+const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
+const generatedDir = join(rootDir, "data", "generated");
 
 function dashScopeKey() {
   return process.env.DASHSCOPE_API_KEY?.trim() || process.env.BAILIAN_API_KEY?.trim() || "";
@@ -24,6 +30,14 @@ function humanizeForSpeech(text: string) {
     .replace(/\s+/gu, " ")
     .trim()
     .slice(0, 1800);
+}
+
+function getSpeechFileName(text: string, voice: string) {
+  const hash = createHash("sha256")
+    .update([ttsModel(), voice, text].join("\n"))
+    .digest("hex")
+    .slice(0, 28);
+  return `speech-${hash}.mp3`;
 }
 
 type BailianTtsMessage = {
@@ -53,9 +67,25 @@ export async function synthesizeBailianSpeech(text: string, gender: ProtagonistG
     throw new Error("speech text is empty");
   }
 
+  const voice = ttsVoice(gender);
+  const fileName = getSpeechFileName(safeText, voice);
+  const filePath = join(generatedDir, fileName);
+  try {
+    const fileStat = await stat(filePath);
+    return {
+      audioUrl: `/generated/${fileName}`,
+      format: "mp3",
+      length: fileStat.size,
+      model: ttsModel(),
+      voice,
+      cached: true
+    };
+  } catch {
+    // Cache miss; synthesize below.
+  }
+
   const taskId = randomUUID().replace(/-/gu, "");
   const audioChunks: Buffer[] = [];
-  const voice = ttsVoice(gender);
 
   await new Promise<void>((resolve, reject) => {
     const socket = new WebSocket("wss://dashscope.aliyuncs.com/api-ws/v1/inference/", {
@@ -163,11 +193,19 @@ export async function synthesizeBailianSpeech(text: string, gender: ProtagonistG
     throw new Error("Bailian TTS returned empty audio");
   }
 
+  await mkdir(generatedDir, { recursive: true });
+  try {
+    await access(filePath);
+  } catch {
+    await writeFile(filePath, audio);
+  }
+
   return {
-    audioUrl: `data:audio/mpeg;base64,${audio.toString("base64")}`,
+    audioUrl: `/generated/${fileName}`,
     format: "mp3",
     length: audio.length,
     model: ttsModel(),
-    voice
+    voice,
+    cached: false
   };
 }

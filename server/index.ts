@@ -10,7 +10,16 @@ import {
   getBailianRuntimeStatus
 } from "./bailian.js";
 import { synthesizeBailianSpeech } from "./bailianTts.js";
-import { deleteBook, getBook, listBookSummaries, saveBook, toBookSummary, updateBook } from "./bookStore.js";
+import {
+  deleteBook,
+  getBook,
+  listBookSummaries,
+  saveBook,
+  toBookSummary,
+  updateBook,
+  type PictureBook,
+  type PictureBookPage
+} from "./bookStore.js";
 import { buildSystemPrompt, chatWithMiniMax, synthesizeSpeech, type ChatMessage } from "./minimax.js";
 import { extractMemoriesFromText, loadMemory, rememberFacts } from "./memoryStore.js";
 import {
@@ -28,6 +37,84 @@ const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 
 app.use(express.json({ limit: "1mb" }));
 app.use("/generated", express.static(join(rootDir, "data", "generated")));
+
+function cleanSpeechPart(text: string) {
+  return text
+    .replace(/第\s*\d+\s*页[，,：:\s]*/gu, "")
+    .replace(/[·•]/gu, " ")
+    .replace(/\s+/gu, " ")
+    .trim()
+    .replace(/[。！？!?.,，、；;：:]+$/gu, "");
+}
+
+function buildPageSpeechText(book: PictureBook, page: PictureBookPage, includeCultureNote = true) {
+  const language = book.language || "zh";
+  const parts = [page.title, page.text, includeCultureNote ? page.cultureNote : ""]
+    .map(cleanSpeechPart)
+    .filter(Boolean);
+  const separator = language === "en" ? ". " : "。";
+  const endMark = language === "en" ? "." : "。";
+  return `${parts.join(separator)}${endMark}`;
+}
+
+async function preloadPictureBookSpeech(book: PictureBook) {
+  if ((book.language || "zh") !== "zh") {
+    return book;
+  }
+
+  const protagonistGender = book.protagonistGender || "girl";
+  const titleText = cleanSpeechPart(book.title);
+  const titleWarmup = titleText
+    ? synthesizeBailianSpeech(titleText, protagonistGender).catch(() => null)
+    : Promise.resolve(null);
+
+  const pageResults = await Promise.allSettled(
+    book.pages.map(async (page) => {
+      const speechAudioText = buildPageSpeechText(book, page, true);
+      if (page.speechAudioUrl && page.speechAudioText === speechAudioText) {
+        return {
+          pageNumber: page.pageNumber,
+          speechAudioText,
+          speechAudioUrl: page.speechAudioUrl
+        };
+      }
+
+      const audio = await synthesizeBailianSpeech(speechAudioText, protagonistGender);
+      return {
+        pageNumber: page.pageNumber,
+        speechAudioText,
+        speechAudioUrl: audio.audioUrl
+      };
+    })
+  );
+  await titleWarmup;
+
+  const speechByPage = new Map(
+    pageResults
+      .filter((result): result is PromiseFulfilledResult<{ pageNumber: number; speechAudioText: string; speechAudioUrl: string }> => result.status === "fulfilled")
+      .map((result) => [result.value.pageNumber, result.value])
+  );
+
+  if (!speechByPage.size) {
+    return book;
+  }
+
+  return (
+    (await updateBook(book.id, (currentBook) => ({
+      ...currentBook,
+      pages: currentBook.pages.map((page) => {
+        const speech = speechByPage.get(page.pageNumber);
+        return speech
+          ? {
+              ...page,
+              speechAudioText: speech.speechAudioText,
+              speechAudioUrl: speech.speechAudioUrl
+            }
+          : page;
+      })
+    }))) || book
+  );
+}
 
 app.get("/api/health", (_request, response) => {
   response.json({ ok: true, service: "xiaoyuan-ai-companion" });
@@ -175,6 +262,21 @@ app.post("/api/picture-books/generate", async (request, response, next) => {
   }
 });
 
+app.post("/api/picture-books/:id/speech/preload", async (request, response, next) => {
+  try {
+    const book = await getBook(request.params.id);
+    if (!book) {
+      response.status(404).json({ error: "picture book not found" });
+      return;
+    }
+
+    const nextBook = await preloadPictureBookSpeech(book);
+    response.json({ book: nextBook, books: await listBookSummaries() });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post("/api/picture-books/:id/pages/:pageNumber/image", async (request, response, next) => {
   try {
     const book = await getBook(request.params.id);
@@ -188,7 +290,15 @@ app.post("/api/picture-books/:id/pages/:pageNumber/image", async (request, respo
     const nextBook = await updateBook(book.id, (currentBook) => {
       return {
         ...currentBook,
-        pages: currentBook.pages.map((page) => (page.pageNumber === result.page.pageNumber ? result.page : page)),
+        pages: currentBook.pages.map((page) =>
+          page.pageNumber === result.page.pageNumber
+            ? {
+                ...result.page,
+                speechAudioText: page.speechAudioText || result.page.speechAudioText,
+                speechAudioUrl: page.speechAudioUrl || result.page.speechAudioUrl
+              }
+            : page
+        ),
         promptRecords: currentBook.promptRecords.concat(result.record)
       };
     });

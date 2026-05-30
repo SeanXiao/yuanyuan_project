@@ -24,6 +24,8 @@ export type PictureBookPage = {
   imageUrl: string;
   imageSource: "bailian" | "placeholder";
   cultureNote: string;
+  speechAudioUrl?: string;
+  speechAudioText?: string;
 };
 
 export type PictureBook = {

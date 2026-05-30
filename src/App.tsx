@@ -41,6 +41,8 @@ type PictureBookPage = {
   imageUrl: string;
   imageSource: "bailian" | "placeholder";
   cultureNote: string;
+  speechAudioUrl?: string;
+  speechAudioText?: string;
 };
 
 type PictureBook = {
@@ -306,28 +308,12 @@ function stopBrowserSpeech() {
   window.speechSynthesis?.cancel();
 }
 
-async function speakWithServerVoice(text: string, shouldKeepSpeaking: () => boolean, protagonistGender: ProtagonistGender = "girl") {
-  if (Date.now() < serverSpeechRetryAt) {
-    throw new Error("Server TTS is cooling down");
-  }
+async function playSpeechAudio(audioUrl: string, shouldKeepSpeaking: () => boolean) {
   if (!shouldKeepSpeaking()) {
     return true;
   }
 
-  const response = await fetch("/api/speech", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, protagonistGender })
-  });
-  const data = (await response.json()) as { audioUrl?: string; error?: string };
-  if (!response.ok || !data.audioUrl) {
-    throw new Error(data.error || "TTS failed");
-  }
-  if (!shouldKeepSpeaking()) {
-    return true;
-  }
-
-  const audio = new Audio(data.audioUrl);
+  const audio = new Audio(audioUrl);
   currentSpeechAudio = audio;
   await new Promise<void>((resolve, reject) => {
     let settled = false;
@@ -365,17 +351,56 @@ async function speakWithServerVoice(text: string, shouldKeepSpeaking: () => bool
   return true;
 }
 
+async function speakWithServerVoice(
+  text: string,
+  shouldKeepSpeaking: () => boolean,
+  protagonistGender: ProtagonistGender = "girl",
+  audioUrl?: string
+) {
+  if (audioUrl) {
+    try {
+      return await playSpeechAudio(audioUrl, shouldKeepSpeaking);
+    } catch {
+      if (!shouldKeepSpeaking()) {
+        return true;
+      }
+    }
+  }
+
+  if (Date.now() < serverSpeechRetryAt) {
+    throw new Error("Server TTS is cooling down");
+  }
+  if (!shouldKeepSpeaking()) {
+    return true;
+  }
+
+  const response = await fetch("/api/speech", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, protagonistGender })
+  });
+  const data = (await response.json()) as { audioUrl?: string; error?: string };
+  if (!response.ok || !data.audioUrl) {
+    throw new Error(data.error || "TTS failed");
+  }
+  if (!shouldKeepSpeaking()) {
+    return true;
+  }
+
+  return playSpeechAudio(data.audioUrl, shouldKeepSpeaking);
+}
+
 async function speakWithBrowser(
   text: string,
   language: BookLanguage = "zh",
-  options?: { shouldContinue?: () => boolean; protagonistGender?: ProtagonistGender }
+  options?: { audioUrl?: string; shouldContinue?: () => boolean; protagonistGender?: ProtagonistGender }
 ) {
   stopBrowserSpeech();
   const runId = browserSpeechRunId;
   const shouldKeepSpeaking = () => runId === browserSpeechRunId && (options?.shouldContinue?.() ?? true);
   if (language === "zh") {
     try {
-      await speakWithServerVoice(text, shouldKeepSpeaking, options?.protagonistGender || "girl");
+      await speakWithServerVoice(text, shouldKeepSpeaking, options?.protagonistGender || "girl", options?.audioUrl);
       return;
     } catch {
       serverSpeechRetryAt = Date.now() + 10 * 60 * 1000;
@@ -538,10 +563,13 @@ function mergePictureBook(current: PictureBook | null, incoming: PictureBook) {
     ...incoming,
     pages: incoming.pages.map((page) => {
       const currentPage = currentPages.get(page.pageNumber);
-      if (currentPage?.imageUrl && !page.imageUrl) {
-        return currentPage;
-      }
-      return page;
+      return {
+        ...page,
+        imageUrl: page.imageUrl || currentPage?.imageUrl || "",
+        imageSource: page.imageUrl ? page.imageSource : currentPage?.imageSource || page.imageSource,
+        speechAudioText: page.speechAudioText || currentPage?.speechAudioText,
+        speechAudioUrl: page.speechAudioUrl || currentPage?.speechAudioUrl
+      };
     }),
     promptRecords: [...mergedRecords.values()]
   };
@@ -646,10 +674,30 @@ export default function App() {
       throw new Error(data.error || "作品不存在");
     }
     setActiveBook(data.book);
+    if ((data.book.language || "zh") === "zh" && data.book.pages.some((page) => !page.speechAudioUrl)) {
+      void preloadSpeechForBook(data.book.id);
+    }
     if (!options?.silent) {
       setNotice("已打开绘本，可以继续换插图或查看创作记录");
     }
     return data.book;
+  }
+
+  async function preloadSpeechForBook(bookId: string) {
+    try {
+      const response = await fetch(`/api/picture-books/${encodeURIComponent(bookId)}/speech/preload`, { method: "POST" });
+      const data = (await response.json()) as { book?: PictureBook; books?: PictureBookSummary[] };
+      if (!response.ok || !data.book) {
+        return null;
+      }
+      setActiveBook((current) => mergePictureBook(current, data.book!));
+      if (data.books) {
+        setBooks(data.books);
+      }
+      return data.book;
+    } catch {
+      return null;
+    }
   }
 
   async function openBook(id: string) {
@@ -694,6 +742,8 @@ export default function App() {
       }
       setActiveBook(data.book);
       setBooks(data.books || []);
+      const speechPreload =
+        bookLanguage === "zh" ? preloadSpeechForBook(data.book.id) : Promise.resolve<PictureBook | null>(null);
       setGenerationProgress((current) =>
         current
           ? {
@@ -728,6 +778,7 @@ export default function App() {
         const results = await Promise.allSettled(
           data.book.pages.map((page) => generateImageForBook(data.book!.id, page.pageNumber, "batch"))
         );
+        await speechPreload;
         const failedCount = results.filter((result) => result.status === "rejected").length;
 
         setGenerationProgress((current) =>
@@ -747,6 +798,7 @@ export default function App() {
         await refreshBooks();
         setNotice(failedCount ? "绘本已经准备好啦：有几页插图可以再画一版" : "绘本已经准备好啦：可以朗读、看插图，也可以查看创作记录");
       } else {
+        void speechPreload;
         setGenerationProgress((current) =>
           current
             ? {
@@ -1515,6 +1567,7 @@ function PictureBookPlayer({ book }: { book: PictureBook | null }) {
           break;
         }
         await speakWithBrowser(buildPageReadText(currentBook, item, includeCultureNote), language, {
+          audioUrl: includeCultureNote ? item.speechAudioUrl : undefined,
           shouldContinue: () => autoPlayRef.current,
           protagonistGender: currentBook.protagonistGender || "girl"
         });
@@ -1539,6 +1592,7 @@ function PictureBookPlayer({ book }: { book: PictureBook | null }) {
     autoPlayRef.current = false;
     setIsAutoPlaying(false);
     void speakWithBrowser(buildPageReadText(currentBook, page, includeCultureNote), language, {
+      audioUrl: includeCultureNote ? page.speechAudioUrl : undefined,
       protagonistGender: currentBook.protagonistGender || "girl"
     });
   }
