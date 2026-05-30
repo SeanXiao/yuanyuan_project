@@ -248,6 +248,10 @@ function formatDate(value: string) {
 
 function softenDisplayText(text = "") {
   return text
+    .replace(/\b(undefined|null|nan)\b/giu, "")
+    .replace(/未定义/gu, "")
+    .replace(/和\s*([。！？!?；;，,])/gu, "$1")
+    .replace(/与\s*([。！？!?；;，,])/gu, "$1")
     .replace(/Prompt\s*记录/giu, "创作记录")
     .replace(/图片\s*Prompt/giu, "插图灵感")
     .replace(/故事生成\s*Prompt/giu, "故事灵感整理")

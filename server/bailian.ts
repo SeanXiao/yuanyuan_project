@@ -45,15 +45,15 @@ function numberFromEnv(name: string, fallback: number) {
 }
 
 function storyTextModel() {
-  return process.env.BAILIAN_STORY_TEXT_MODEL || "qwen-turbo";
+  return process.env.BAILIAN_STORY_TEXT_MODEL || process.env.BAILIAN_TEXT_MODEL || "qwen-plus";
 }
 
 function storyTextMaxTokens() {
-  return numberFromEnv("BAILIAN_STORY_TEXT_MAX_TOKENS", 2600);
+  return numberFromEnv("BAILIAN_STORY_TEXT_MAX_TOKENS", 4200);
 }
 
 function storyTextTimeoutMs() {
-  return numberFromEnv("BAILIAN_STORY_TEXT_TIMEOUT_MS", 28000);
+  return numberFromEnv("BAILIAN_STORY_TEXT_TIMEOUT_MS", 45000);
 }
 
 function inspirationTextModel() {
@@ -308,6 +308,105 @@ function draftHasUnsupportedDefaultSignals(draft: BookDraft, idea: string) {
   return ["绣球", "山歌", "刘三姐", "三月三", "歌圩", "壮锦", "铜鼓"].some(
     (item) => text.includes(item) && isUnsupportedDefaultHeritage(item, idea)
   );
+}
+
+function cleanGeneratedText(value: unknown = "", language: BookLanguage = "zh") {
+  return useGuiXiaolingName(value, language)
+    .replace(/\b(undefined|null|nan)\b/giu, "")
+    .replace(/未定义/gu, "")
+    .replace(/和\s*([。！？!?；;，,])/gu, "$1")
+    .replace(/与\s*([。！？!?；;，,])/gu, "$1")
+    .replace(/\s+([。！？!?；;，,])/gu, "$1")
+    .replace(/[ \t]{2,}/gu, " ")
+    .replace(/\n{3,}/gu, "\n\n")
+    .trim();
+}
+
+function compactStoryText(value = "") {
+  return value.replace(/[\s，。！？、；：,.!?;:"“”‘’《》()（）-]/gu, "");
+}
+
+function getIdeaAnchorGroups(idea: string) {
+  const groups = [
+    { triggers: ["三娘湾", "sanniang"], required: ["三娘湾", "钦州三娘湾"] },
+    { triggers: ["钦州", "qinzhou"], required: ["钦州"] },
+    { triggers: ["海豚", "狗海豚", "白海豚", "中华白海豚", "dolphin"], required: ["海豚", "白海豚", "中华白海豚"] },
+    { triggers: ["螃蟹", "蟹", "钓螃蟹", "赶海", "crab"], required: ["螃蟹", "蟹", "蟹洞", "赶海"] },
+    { triggers: ["烧烤", "烤", "barbecue"], required: ["烧烤", "烤虾", "烤玉米", "烤"] },
+    { triggers: ["海边", "沙滩", "大海", "海湾", "浪花"], required: ["海边", "沙滩", "大海", "海湾", "海风", "浪花"] },
+    { triggers: ["柳州"], required: ["柳州"] },
+    { triggers: ["鱼峰山"], required: ["鱼峰山"] },
+    { triggers: ["对歌", "山歌", "歌圩"], required: ["对歌", "山歌", "歌圩"] },
+    { triggers: ["三月三"], required: ["三月三"] },
+    { triggers: ["螺蛳粉"], required: ["螺蛳粉"] },
+    { triggers: ["漓江"], required: ["漓江"] },
+    { triggers: ["刘三姐"], required: ["刘三姐"] }
+  ];
+  return groups.filter((group) => ideaMentionsAny(idea, group.triggers));
+}
+
+function draftKeepsCoreIdea(draft: BookDraft, idea: string) {
+  const anchors = getIdeaAnchorGroups(idea);
+  if (!anchors.length) {
+    return true;
+  }
+
+  const text = [
+    draft.title,
+    draft.subtitle,
+    draft.outline,
+    draft.tourGuideScript,
+    draft.studentReflection,
+    ...(draft.heritageElements || []),
+    ...(draft.tourismElements || []),
+    ...(draft.pages || []).flatMap((page) => [page.title, page.text, page.cultureNote, page.imagePrompt])
+  ]
+    .map((item) => cleanGeneratedText(item))
+    .join("\n");
+
+  const matchedCount = anchors.filter((group) => ideaMentionsAny(text, group.required)).length;
+  const hasNamedPlace = anchors.some((group) => group.triggers.includes("三娘湾") || group.triggers.includes("鱼峰山"));
+  if (hasNamedPlace && matchedCount < Math.min(2, anchors.length)) {
+    return false;
+  }
+  return matchedCount / anchors.length >= 0.6;
+}
+
+function draftHasUnrelatedSceneDrift(draft: BookDraft, idea: string) {
+  const text = [
+    draft.title,
+    draft.subtitle,
+    draft.outline,
+    draft.tourGuideScript,
+    ...(draft.heritageElements || []),
+    ...(draft.tourismElements || []),
+    ...(draft.pages || []).flatMap((page) => [page.title, page.text, page.cultureNote])
+  ]
+    .map((item) => cleanGeneratedText(item))
+    .join("\n");
+
+  if (ideaMentionsAny(idea, ["三娘湾", "海豚", "螃蟹", "钓螃蟹", "烧烤", "海边"])) {
+    return ideaMentionsAny(text, ["百色", "芒果园", "右江河谷", "田东芒果", "田阳芒果"]);
+  }
+  return false;
+}
+
+function draftHasThinOrBrokenPages(draft: BookDraft, language: BookLanguage) {
+  const pages = Array.isArray(draft.pages) ? draft.pages.slice(0, 4) : [];
+  if (pages.length < 4) {
+    return true;
+  }
+
+  return pages.some((page) => {
+    const text = cleanGeneratedText(page.text, language);
+    if (!text || /\b(undefined|null|nan)\b/iu.test(String(page.text || ""))) {
+      return true;
+    }
+    if (language === "en") {
+      return text.split(/\s+/u).filter(Boolean).length < 35;
+    }
+    return compactStoryText(text).length < 80;
+  });
 }
 
 function getSeasonalContext(date = new Date(), language: BookLanguage = "zh") {
@@ -572,26 +671,26 @@ function normalizeDraft(idea: string, draft: BookDraft, language: BookLanguage, 
   const rawHeritage = Array.isArray(draft.heritageElements) && draft.heritageElements.length ? draft.heritageElements : fallback.heritageElements;
 
   return {
-    title: useGuiXiaolingName(draft.title || fallback.title, language),
-    subtitle: useGuiXiaolingName(draft.subtitle || fallback.subtitle, language),
+    title: cleanGeneratedText(draft.title || fallback.title, language),
+    subtitle: cleanGeneratedText(draft.subtitle || fallback.subtitle, language),
     originalIdea: idea,
     language,
     protagonistGender,
     heritageElements: sceneFirstHeritageElements(idea, rawHeritage, language),
     tourismElements: sceneFirstTourismElements(idea, draft.tourismElements || fallback.tourismElements, language),
-    guidingQuestions: (draft.guidingQuestions || fallback.guidingQuestions).slice(0, 3).map((item) => useGuiXiaolingName(item, language)),
-    outline: useGuiXiaolingName(draft.outline || fallback.outline, language),
+    guidingQuestions: (draft.guidingQuestions || fallback.guidingQuestions).slice(0, 3).map((item) => cleanGeneratedText(item, language)),
+    outline: cleanGeneratedText(draft.outline || fallback.outline, language),
     pages: pages.map((page, index) => ({
       pageNumber: index + 1,
-      title: useGuiXiaolingName(page.title || fallback.pages[index]?.title || `第 ${index + 1} 页`, language),
-      text: useGuiXiaolingName(page.text || fallback.pages[index]?.text || "", language),
-      imagePrompt: withCharacterImagePrompt(page.imagePrompt || fallback.pages[index]?.imagePrompt || "", language, protagonistGender),
+      title: cleanGeneratedText(page.title || fallback.pages[index]?.title || `第 ${index + 1} 页`, language),
+      text: cleanGeneratedText(page.text || fallback.pages[index]?.text || "", language),
+      imagePrompt: withCharacterImagePrompt(cleanGeneratedText(page.imagePrompt || fallback.pages[index]?.imagePrompt || "", language), language, protagonistGender),
       imageUrl: page.imageUrl || "",
       imageSource: page.imageSource || "placeholder",
-      cultureNote: useGuiXiaolingName(page.cultureNote || fallback.pages[index]?.cultureNote || "", language)
+      cultureNote: cleanGeneratedText(page.cultureNote || fallback.pages[index]?.cultureNote || "", language)
     })),
-    tourGuideScript: useGuiXiaolingName(draft.tourGuideScript || fallback.tourGuideScript, language),
-    studentReflection: useGuiXiaolingName(draft.studentReflection || fallback.studentReflection, language),
+    tourGuideScript: cleanGeneratedText(draft.tourGuideScript || fallback.tourGuideScript, language),
+    studentReflection: cleanGeneratedText(draft.studentReflection || fallback.studentReflection, language),
     aiContentRatio: Number(draft.aiContentRatio || 90)
   };
 }
@@ -613,6 +712,7 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
           "Companion character: whenever the AI helper or robot helper appears in the story, its name must be Gui Xiaoling. Do not write generic names such as AI assistant, AI helper, assistant, or Xiaoyuan.",
           "Content: Combine Guangxi travel scenes, local culture, nature, food, daily life, and creative-writing growth. Use intangible heritage only when it naturally fits the scene.",
           sceneFirstGuide,
+          "Fidelity rule: Preserve the student's named place, activity, object, food, animal, and mood. If the idea mentions Sanniang Bay, dolphins, crabs, beach barbecue, or another concrete detail, those details must drive the plot and must not be replaced by another Guangxi place.",
           "Storyboard must stay centered on the preferred elements above. Do not suddenly switch to other famous Guangxi places or symbols unless the student idea mentions them.",
           "Do not add Sanyuesan, song fairs, mountain songs, embroidered balls, Liu Sanjie, Zhuang brocade, or bronze drums unless those words or a clearly related scene appears in the student idea.",
           "Each page must show concrete place, action, and cultural detail. Avoid vague wording such as only saying heritage, tradition, or secret.",
@@ -628,6 +728,7 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
           "伙伴角色：如果故事里出现帮助我的 AI 或机器人助手，名字必须是“桂小灵”，不要写“AI小助手”“AI助手”“小助手”“小圆”。",
           "内容：融合广西文旅场景、地方文化、自然风景、美食物产、日常生活和创编能力训练；只有自然贴合时才使用非遗。",
           sceneFirstGuide,
+          "忠实原则：必须保留学生灵感里的具体地点、活动、物件、食物、动物和情绪。如果灵感写了三娘湾、海豚、螃蟹、海边烧烤等具体内容，这些内容必须推动故事，不能改写成百色、芒果园或其他无关广西地点。",
           "4 页分镜必须围绕上面“本次灵感优先考虑”的元素推进，不要突然跳到其他知名广西地点或符号。",
           "不要主动添加三月三、歌圩、山歌、绣球、刘三姐、壮锦、铜鼓，除非学生灵感明确出现这些词或高度相关场景。",
           "每页必须有具体地点、人物动作和文化细节，避免只写“非遗文化”“传统技艺”“秘密”这类空泛表达。",
@@ -653,7 +754,7 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
           "guidingQuestions: 2-3 questions that help the student continue creating, in English",
           "outline: story outline within 55 English words",
           "pages: an array of exactly 4 pages. Each page includes pageNumber, title, text, imagePrompt, cultureNote",
-          "Each page text should be 35-60 English words, child-friendly and easy to read aloud.",
+          "Each page text should be 55-85 English words, child-friendly and easy to read aloud. The full book should feel like a 50-70 second read-aloud story, not a short outline.",
           "Each page should be storyboard-ready: one clear visual moment, one action, and one concrete Guangxi detail.",
           "Every cultural highlight must have a story reason: place, festival, food, sound, character action, nature, or local life. Do not insert Zhuang brocade or bronze drums unless the student idea or chosen scene supports them.",
           "tourGuideScript: a cultural tourism guide script within 90 English words, suitable for an elementary-school student to read aloud",
@@ -679,6 +780,7 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
           "guidingQuestions: 2-3 个用于启发学生继续创编的问题",
           "outline: 80 字以内故事大纲",
           "pages: 4 页数组，每页包含 pageNumber, title, text, imagePrompt, cultureNote",
+          "每页正文必须 100-150 个中文字，整本读起来约 50-70 秒；不要缩水成一句提纲，也不要只写说明文字。",
           "每页正文要适合直接画成插图：一个清楚画面、一个动作、一个具体广西细节。",
           "每个文化亮点都必须有故事理由：地点、节日、食物、声音、人物行动、自然观察或当地生活。不要为了“广西感”强行加入壮锦或铜鼓，除非学生灵感或场景自然支持。",
           "tourGuideScript: 小学生能朗读的 120 字以内文旅讲解词",
@@ -696,6 +798,12 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
       { role: "user", content: userPrompt }
     ], { maxTokens: storyTextMaxTokens(), model: storyTextModel(), temperature: 0.72, timeoutMs: storyTextTimeoutMs() });
     const normalized = normalizeDraft(idea, extractJson(content), language, protagonistGender);
+    if (draftHasThinOrBrokenPages(normalized, language)) {
+      throw new Error("草稿页数、篇幅或文本完整性不足，已切换为更完整的应景草稿。");
+    }
+    if (!draftKeepsCoreIdea(normalized, idea) || draftHasUnrelatedSceneDrift(normalized, idea)) {
+      throw new Error("草稿偏离了学生原始灵感，已切换为更贴合的应景草稿。");
+    }
     if (draftHasUnsupportedDefaultSignals(normalized, idea)) {
       throw new Error("AI 草稿加入了与灵感不匹配的默认广西符号，已切换为应景草稿。");
     }

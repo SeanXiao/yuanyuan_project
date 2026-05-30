@@ -24,6 +24,8 @@ const heritageCatalog: SceneOption[] = [
   { name: "北海贝雕", keywords: ["北海", "银滩", "贝壳", "贝雕", "大海", "沙滩", "beihai", "shell"] },
   { name: "合浦南珠制作技艺", keywords: ["合浦", "南珠", "珍珠", "北海", "银滩", "pearl"] },
   { name: "疍家渔歌", keywords: ["疍家", "渔歌", "渔船", "海边", "北海", "银滩", "fishing"] },
+  { name: "三娘湾中华白海豚生态观察", keywords: ["三娘湾", "钦州", "海豚", "白海豚", "中华白海豚", "海湾", "海洋", "dolphin"] },
+  { name: "钦州海边赶海生活", keywords: ["三娘湾", "钦州", "赶海", "螃蟹", "蟹", "钓螃蟹", "海边", "沙滩", "烧烤", "渔家"] },
   { name: "侗族大歌", keywords: ["侗族", "三江", "程阳", "风雨桥", "鼓楼", "大歌", "dong"] },
   { name: "侗族木构建筑营造技艺", keywords: ["三江", "程阳", "风雨桥", "鼓楼", "木构", "桥"] },
   { name: "侗族刺绣", keywords: ["侗族", "三江", "服饰", "刺绣", "衣饰"] },
@@ -51,6 +53,8 @@ const tourismCatalog: SceneOption[] = [
   { name: "崇左明仕田园", keywords: ["德天", "瀑布", "大新", "崇左", "明仕"] },
   { name: "北海银滩", keywords: ["北海", "银滩", "大海", "沙滩", "beihai"] },
   { name: "合浦海丝首港", keywords: ["北海", "合浦", "南珠", "珍珠", "海丝"] },
+  { name: "钦州三娘湾", keywords: ["三娘湾", "钦州", "海豚", "白海豚", "中华白海豚", "螃蟹", "赶海", "海边", "沙滩", "烧烤"] },
+  { name: "钦州茅尾海", keywords: ["钦州", "茅尾海", "海湾", "赶海", "渔船", "海鲜", "螃蟹"] },
   { name: "三江程阳风雨桥", keywords: ["三江", "程阳", "风雨桥", "鼓楼", "侗族"] },
   { name: "三江鼓楼侗寨", keywords: ["三江", "侗族", "鼓楼", "侗寨", "大歌"] },
   { name: "龙脊梯田", keywords: ["龙脊", "梯田", "稻田", "terrace"] },
@@ -94,6 +98,10 @@ const cultureNotes: Record<string, string> = {
   柳州柳江城市风景: "柳江穿城而过，桥梁、夜景和市井生活能展现柳州活泼的城市气质。",
   南宁老街城市记忆: "老街里的骑楼、店铺和街巷故事，适合表现城市记忆与日常生活。",
   北海银滩海洋观察: "银滩的浪花、贝壳、海风和潮汐，适合写儿童观察自然和保护海洋的故事。",
+  三娘湾中华白海豚生态观察: "三娘湾常被人们和中华白海豚联系在一起，适合写海洋观察、保护海湾和亲近自然的旅行故事。",
+  钦州海边赶海生活: "钦州海边的赶海生活能看到蟹洞、潮水、渔船和海风，适合把自然观察写进儿童旅行故事。",
+  钦州三娘湾海洋观察: "三娘湾有海风、沙滩、渔船和海豚传说，是观察海洋、认识海湾生态的好地方。",
+  钦州茅尾海渔家生活: "茅尾海有海湾、渔船和海鲜风味，适合表现钦州海边日常和渔家生活。",
   钦州坭兴陶烧制技艺: "钦州坭兴陶以陶土、烧制和窑变见长，适合手作体验类故事。",
   壮锦织造技艺: "壮锦织造技艺图案鲜明、色彩丰富，适合织布、纹样和家传手艺故事。",
   铜鼓习俗: "铜鼓习俗和节庆、仪式、鼓声有关，适合真正出现鼓声或铜鼓线索的故事。"
@@ -134,6 +142,8 @@ function tourismCultureLabel(name: string) {
     崇左明仕田园: "明仕田园喀斯特风光",
     北海银滩: "北海银滩海洋观察",
     合浦海丝首港: "合浦海丝港口故事",
+    钦州三娘湾: "钦州三娘湾海洋观察",
+    钦州茅尾海: "钦州茅尾海渔家生活",
     三江程阳风雨桥: "三江风雨桥建筑观察",
     三江鼓楼侗寨: "三江侗寨生活观察",
     龙脊梯田: "龙脊梯田农耕风景",
@@ -196,7 +206,7 @@ export function buildSceneFirstHeritageGuide(idea: string, language: BookLanguag
   return [
     "文化选择原则：先读学生灵感里的地点、节日、食物、声音、人物和动作；有自然贴合的非遗就介绍非遗，没有非遗也可以介绍有意义的地方亮点，如山水、物产、农耕、城市记忆、建筑、生态或日常生活。",
     "不要把壮锦、铜鼓当作默认广西符号；只有学生提到织锦、纹样、铜鼓、鼓声，或故事场景确实相关时才使用。",
-    "示例：北海/银滩/海边 -> 北海贝雕、合浦南珠制作技艺、疍家渔歌；三月三/歌圩/山歌/绣球 -> 壮族三月三、壮族山歌、壮族绣球、五色糯米饭；三江/风雨桥 -> 侗族大歌、侗族木构建筑营造技艺；柳州/美食 -> 柳州螺蛳粉制作技艺；桂林/漓江/刘三姐 -> 刘三姐歌谣、桂林米粉制作技艺。",
+    "示例：北海/银滩/海边 -> 北海贝雕、合浦南珠制作技艺、疍家渔歌；三娘湾/钦州/海豚/螃蟹/赶海 -> 三娘湾中华白海豚生态观察、钦州海边赶海生活、钦州三娘湾海洋观察；三月三/歌圩/山歌/绣球 -> 壮族三月三、壮族山歌、壮族绣球、五色糯米饭；三江/风雨桥 -> 侗族大歌、侗族木构建筑营造技艺；柳州/美食 -> 柳州螺蛳粉制作技艺；桂林/漓江/刘三姐 -> 刘三姐歌谣、桂林米粉制作技艺。",
     `本次灵感优先考虑这些文化亮点：${heritage.join("、")}。文旅场景优先考虑：${tourism.join("、")}。`
   ].join("\n");
 }
@@ -270,6 +280,9 @@ function getCultureNote(name: string, language: BookLanguage) {
 
 function makeFallbackTitle(idea: string, language: BookLanguage) {
   if (language === "en") {
+    if (ideaIncludesAny(idea, ["三娘湾", "钦州", "海豚", "白海豚", "螃蟹", "赶海", "sanniang", "dolphin"])) {
+      return "Dolphins and Little Crabs in Sanniang Bay";
+    }
     if (ideaIncludesAny(idea, ["北海", "银滩", "beihai", "sea"])) {
       return "The Shell-Carving Treasure on Silver Beach";
     }
@@ -291,6 +304,9 @@ function makeFallbackTitle(idea: string, language: BookLanguage) {
     return "My Scene-First Guangxi Story";
   }
 
+  if (ideaIncludesAny(idea, ["三娘湾", "钦州", "海豚", "白海豚", "中华白海豚", "螃蟹", "钓螃蟹", "赶海", "海边烧烤", "烧烤"])) {
+    return "三娘湾的海豚和小螃蟹";
+  }
   if (ideaIncludesAny(idea, ["北海", "银滩", "大海", "贝壳"])) {
     return "银滩上的贝雕寻宝记";
   }
@@ -310,6 +326,57 @@ function makeFallbackTitle(idea: string, language: BookLanguage) {
     return "歌圩里的会唱歌绣球";
   }
   return "我的广西应景小故事";
+}
+
+function makeChineseFallbackPages(
+  idea: string,
+  heritage: string[],
+  tourism: string[],
+  protagonistGender: ProtagonistGender
+) {
+  if (ideaIncludesAny(idea, ["三娘湾", "钦州", "海豚", "白海豚", "中华白海豚", "螃蟹", "钓螃蟹", "赶海", "海边烧烤", "烧烤"])) {
+    return [
+      {
+        title: "海风把灵感吹来",
+        text:
+          "周末，我背着小桶和画本来到钦州三娘湾。海风咸咸的，沙滩上有一串串小脚印。桂小灵提醒我先观察潮水，再靠近浅浅的沙地。我把想钓螃蟹、看海豚、吃海边烧烤的愿望写在第一页，故事就从浪花声里开始了。"
+      },
+      {
+        title: "小螃蟹的沙洞",
+        text:
+          "退潮后，我蹲在湿湿的沙地旁，看见一个圆圆的小洞。桂小灵把镜头放低，屏幕上出现小螃蟹探头的样子。我没有用力去抓它，只把它画进本子里，还记下蟹洞、贝壳和海草的位置。原来赶海最重要的不是带走多少东西，而是学会慢慢观察。"
+      },
+      {
+        title: "海面上的白色弧线",
+        text:
+          "下午，远处海面忽然亮起一道白色弧线，像浪花跳了起来。岸边的叔叔告诉我们，三娘湾常让人想起中华白海豚，大家看海豚时要安静，不追赶、不喂食，也不把垃圾留在沙滩上。我和桂小灵把这一刻画成一张会发光的海湾明信片。"
+      },
+      {
+        title: "烧烤香里的小导游词",
+        text:
+          "傍晚，海边飘来玉米和烤虾的香味，我一边吃晚饭，一边把今天的发现讲给家人听：三娘湾有海风、蟹洞、渔船，也有需要我们保护的海豚朋友。桂小灵帮我把这些话整理成绘本。我想把这本书带回班里，邀请同学们一起温柔地认识大海。"
+      }
+    ];
+  }
+
+  return [
+    {
+      title: "灵感发光",
+      text: `我把自己的灵感说给桂小灵听，${heritage[0]}成了第一条线索，因为它和这个地点、人物、心情最合拍。桂小灵没有急着把故事写完，而是先问我看见了什么、听见了什么、最想让同学记住哪一个广西细节。`
+    },
+    {
+      title: "走进广西",
+      text: `我们来到了${tourism[0]}，这里的声音、颜色和人们的生活，自然而然把我们带向${heritage[1]}。我一边走一边观察，把路边的风景、空气里的味道和当地人的动作都记下来，让故事不只是介绍，而像一次真正的旅行。`
+    },
+    {
+      title: "小小讲解员",
+      text: `路上，我遇到一个想了解广西文化的小伙伴。我用桂小灵帮我整理的词语，向他介绍${heritage[0]}和${heritage[2]}。我发现，讲文化不是背答案，而是把自己亲眼看到、亲耳听到的发现说清楚。`
+    },
+    {
+      title: "我的创编绘本",
+      text: `最后，我把今天的冒险创编成一本绘本，也把${tourism[1]}介绍给更多同学。每个文化小发现都出现在最适合它的地方，主角的心情也从好奇、观察、分享，慢慢变成了想继续探索广西的勇气。`
+    }
+  ];
 }
 
 export function createFallbackBook(idea: string, language: BookLanguage = "zh", protagonistGender: ProtagonistGender = "girl"): PictureBook {
@@ -366,18 +433,13 @@ export function createFallbackBook(idea: string, language: BookLanguage = "zh", 
 
   const title = makeFallbackTitle(idea, language);
 
-  const pageTexts = [
-    `我把自己的灵感说给桂小灵听，${heritage[0]}成了第一条线索，因为它和这个地点、人物、心情最合拍。`,
-    `我们来到了${tourism[0]}，这里的声音、颜色和人们的生活，自然而然把我们带向${heritage[1]}。`,
-    `路上，我遇到一个想了解广西文化的小伙伴。我用桂小灵帮我整理的词语，向他介绍${heritage[0]}和${heritage[2]}。`,
-    `最后，我把今天的冒险创编成一本绘本，也把${tourism[1]}介绍给更多同学。每个文化小发现都出现在最适合它的地方。`
-  ];
+  const fallbackPages = makeChineseFallbackPages(idea, heritage, tourism, protagonistGender);
 
-  const pages: PictureBookPage[] = pageTexts.map((text, index) => ({
+  const pages: PictureBookPage[] = fallbackPages.map((page, index) => ({
     pageNumber: index + 1,
-    title: ["灵感发光", "走进广西", "小小讲解员", "我的创编绘本"][index],
-    text,
-    imagePrompt: makeIllustrationPrompt(["灵感发光", "走进广西", "小小讲解员", "我的创编绘本"][index], text, heritage, tourism, language, protagonistGender),
+    title: page.title,
+    text: page.text,
+    imagePrompt: makeIllustrationPrompt(page.title, page.text, heritage, tourism, language, protagonistGender),
     imageUrl: "",
     imageSource: "placeholder",
     cultureNote: getCultureNote(heritage[index % heritage.length], language)
