@@ -104,11 +104,11 @@ type AppRoute =
     };
 
 const stageLabels: Record<ProgressStage, string> = {
-  understanding: "理解灵感",
-  story: "创编故事",
-  prompts: "规划插图",
-  images: "生成图片",
-  archive: "保存作品"
+  understanding: "写下灵感",
+  story: "整理故事",
+  prompts: "绘制插图",
+  images: "装订成册",
+  archive: "放进书架"
 };
 
 const progressStages: ProgressStage[] = ["understanding", "story", "prompts", "images", "archive"];
@@ -122,11 +122,11 @@ const emptyImageTasks: Record<number, ImageTaskStatus> = {
 
 const inspirationChips = [
   "三月三歌圩上的会唱歌绣球",
-  "会发光的壮锦带我去桂林山水",
+  "漓江边的刘三姐山歌地图",
   "德天瀑布边的小小文旅推荐官",
-  "铜鼓机器人守护龙脊梯田",
-  "北海银滩上的非遗集市",
-  "刘三姐山歌变成了魔法地图"
+  "三江风雨桥里的侗族大歌",
+  "北海银滩上的贝雕寻宝记",
+  "柳州螺蛳粉香气里的非遗集市"
 ];
 
 function getAppRoute(): AppRoute {
@@ -213,6 +213,49 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
+function softenDisplayText(text = "") {
+  return text
+    .replace(/Prompt\s*记录/giu, "创作记录")
+    .replace(/图片\s*Prompt/giu, "插图灵感")
+    .replace(/故事生成\s*Prompt/giu, "故事灵感整理")
+    .replace(/\bPrompt\b/giu, "灵感说明")
+    .replace(/AI\s*生成内容约\s*\d+%/giu, "故事内容已整理")
+    .replace(/AI\s*生成/giu, "桂小灵整理")
+    .replace(/AI\s*追问/giu, "灵感小问题")
+    .replace(/AI\s*小助手|AI\s*助手/giu, "桂小灵")
+    .replace(/\bAI\b/giu, "桂小灵")
+    .replace(/并行/gu, "一起")
+    .replace(/生成率/gu, "完成度")
+    .replace(/生成图片/gu, "绘制插图")
+    .replace(/重新生成/gu, "重新画一版")
+    .replace(/生成插图/gu, "绘制插图")
+    .replace(/生成绘本/gu, "制作绘本")
+    .replace(/模型/gu, "画笔")
+    .replace(/任务/gu, "小步骤")
+    .replace(/工作流/gu, "创作路线")
+    .replace(/调试|Debug/giu, "查看")
+    .replace(/\bStep\b/giu, "步骤");
+}
+
+function softenRecordText(text = "") {
+  return softenDisplayText(text)
+    .replace(/百炼/gu, "桂小灵")
+    .replace(/OpenAI/giu, "创作伙伴")
+    .replace(/DashScope/giu, "创作伙伴")
+    .replace(/system/giu, "创作设定")
+    .replace(/user/giu, "我的灵感");
+}
+
+function getRecordTypeLabel(type: PromptRecord["type"]) {
+  const labels: Record<PromptRecord["type"], string> = {
+    story: "故事整理",
+    image: "插图灵感",
+    culture: "文化小知识",
+    system: "书桌记录"
+  };
+  return labels[type];
+}
+
 function cleanSpeechPart(text: string) {
   return text
     .replace(/第\s*\d+\s*页[，,：:\s]*/gu, "")
@@ -225,6 +268,7 @@ function cleanSpeechPart(text: string) {
 function buildReadText(book: PictureBook) {
   const language = book.language || "zh";
   const parts = [book.title, ...book.pages.map((page) => page.text), book.tourGuideScript]
+    .map(softenDisplayText)
     .map(cleanSpeechPart)
     .filter(Boolean);
   if (!parts.length) {
@@ -238,7 +282,10 @@ function buildReadText(book: PictureBook) {
 
 function buildPageReadText(book: PictureBook, page: PictureBookPage, includeCultureNote = false) {
   const language = book.language || "zh";
-  const parts = [page.title, page.text, includeCultureNote ? page.cultureNote : ""].map(cleanSpeechPart).filter(Boolean);
+  const parts = [page.title, page.text, includeCultureNote ? page.cultureNote : ""]
+    .map(softenDisplayText)
+    .map(cleanSpeechPart)
+    .filter(Boolean);
   const separator = language === "en" ? ". " : "。";
   const endMark = language === "en" ? "." : "。";
   return `${parts.join(separator)}${endMark}`;
@@ -283,7 +330,7 @@ export default function App() {
   const [idea, setIdea] = useState("我想写一个小朋友在三月三歌圩上遇到会唱山歌的绣球。");
   const [books, setBooks] = useState<PictureBookSummary[]>([]);
   const [activeBook, setActiveBook] = useState<PictureBook | null>(null);
-  const [notice, setNotice] = useState("说一句灵感，桂小灵会帮我创编广西非遗文旅绘本");
+  const [notice, setNotice] = useState("写下一句灵感，桂小灵陪你做一本广西非遗绘本");
   const [isGenerating, setIsGenerating] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [shouldGenerateImage, setShouldGenerateImage] = useState(true);
@@ -292,10 +339,12 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<"book" | "prompts">("book");
   const [generationProgress, setGenerationProgress] = useState<GenerationProgress | null>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const workbenchRef = useRef<HTMLElement | null>(null);
+  const workbenchBodyRef = useRef<HTMLDivElement | null>(null);
   const speechSupported = Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
 
   useEffect(() => {
-    document.title = route.mode === "player" ? "桂韵创想家正式播放 - 肖予曦开发" : "桂韵创想家 - 肖予曦开发";
+    document.title = route.mode === "player" ? "桂小灵绘本剧场 - 肖予曦开发" : "桂小灵绘本工坊 - 肖予曦开发";
   }, [route.mode]);
 
   useEffect(() => {
@@ -313,7 +362,7 @@ export default function App() {
       return;
     }
     void loadBook(route.bookId, { silent: true }).catch((error) => {
-      const message = error instanceof Error ? error.message : "正式播放页打开失败";
+      const message = error instanceof Error ? error.message : "绘本剧场打开失败";
       setNotice(message);
     });
   }, [activeBook?.id, route]);
@@ -338,6 +387,13 @@ export default function App() {
     return () => window.clearInterval(timer);
   }, [generationProgress?.active]);
 
+  useEffect(() => {
+    workbenchBodyRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    if (activeBook) {
+      workbenchRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+    }
+  }, [activeBook?.id, activeTab]);
+
   async function refreshBooks() {
     const response = await fetch("/api/picture-books");
     const data = (await response.json()) as { books?: PictureBookSummary[] };
@@ -353,7 +409,7 @@ export default function App() {
     }
     setActiveBook(data.book);
     if (!options?.silent) {
-      setNotice("已打开作品，可以继续生成插图或查看 Prompt 记录");
+      setNotice("已打开绘本，可以继续换插图或查看创作记录");
     }
     return data.book;
   }
@@ -375,17 +431,17 @@ export default function App() {
     setActiveTab("book");
     setActiveBook(null);
     setGenerationProgress(
-      makeProgress("understanding", "正在理解我的灵感", "桂小灵正在提取故事主角、广西非遗元素和文旅场景。")
+      makeProgress("understanding", "正在把灵感写进故事本", "桂小灵正在找主角、广西非遗和旅行地点。")
     );
-    setNotice("第 1 步：正在理解灵感，还没有开始生成图片");
+    setNotice("桂小灵正在读你的灵感，马上开始整理故事");
     try {
       setGenerationProgress((current) =>
         current
           ? {
               ...current,
               stage: "story",
-              title: "正在创编故事",
-              detail: "正在调用百炼文本模型，生成标题、4 页故事、非遗小知识和小学生讲解词。"
+              title: "正在整理故事",
+              detail: "桂小灵正在整理标题、4 页故事、非遗小知识和小学生讲解词。"
             }
           : current
       );
@@ -396,7 +452,7 @@ export default function App() {
       });
       const data = (await response.json()) as { book?: PictureBook; books?: PictureBookSummary[]; error?: string };
       if (!response.ok || !data.book) {
-        throw new Error(data.error || "绘本生成失败");
+        throw new Error(data.error || "绘本制作失败");
       }
       setActiveBook(data.book);
       setBooks(data.books || []);
@@ -405,10 +461,10 @@ export default function App() {
           ? {
               ...current,
               stage: shouldGenerateImage ? "prompts" : "archive",
-              title: shouldGenerateImage ? "正在规划 4 页插图" : "正在保存故事作品",
+              title: shouldGenerateImage ? "正在为绘本分镜" : "正在放进我的书架",
               detail: shouldGenerateImage
-                ? "故事骨架已经出现，正在把 4 页画面整理成连贯角色设定和图片 Prompt。"
-                : "故事、Prompt 记录和创作档案正在保存。"
+                ? "故事路线已经出现，正在整理 4 页画面和角色样子。"
+                : "故事、创作记录和绘本档案正在放进书架。"
             }
           : current
       );
@@ -423,13 +479,13 @@ export default function App() {
             ? {
                 ...current,
                 stage: "images",
-                title: "正在并行生成 4 页连贯插图",
-                detail: "4 个图片任务已经同时发给百炼图片模型，回来一张就更新一页。",
+                title: "正在为故事页绘制插图",
+                detail: "桂小灵会把 4 个故事页一页页画好，完成后自动放回绘本。",
                 imageTasks: runningTasks
               }
             : current
         );
-        setNotice("第 4 步：故事已生成，正在并行生成 4 页图片");
+        setNotice("故事已经整理好，桂小灵正在绘制插图");
 
         const results = await Promise.allSettled(
           data.book.pages.map((page) => generateImageForBook(data.book!.id, page.pageNumber, "batch"))
@@ -442,16 +498,16 @@ export default function App() {
                 ...current,
                 active: false,
                 stage: "archive",
-                title: failedCount ? "绘本已保存，部分图片可重试" : "绘本创编完成",
+                title: failedCount ? "故事书已装订完成，部分插图可再画" : "故事书已装订完成",
                 detail: failedCount
-                  ? `有 ${failedCount} 页图片请求没有成功，已保留故事和可重试按钮。`
-                  : "4 页故事、连贯插图、非遗小知识和 Prompt 记录都已保存。",
-                error: failedCount ? "部分图片生成失败" : undefined
+                  ? `有 ${failedCount} 页插图还没画好，故事已先放进绘本。`
+                  : "4 页故事、插图和非遗小知识都已经放进绘本里了。",
+                error: failedCount ? "部分插图还没画好" : undefined
               }
             : current
         );
         await refreshBooks();
-        setNotice(failedCount ? "创编完成：部分图片可点击重试" : "创编完成：可以朗读、看插图，也可以查看 Prompt 记录");
+        setNotice(failedCount ? "绘本已经准备好啦：有几页插图可以再画一版" : "绘本已经准备好啦：可以朗读、看插图，也可以查看创作记录");
       } else {
         setGenerationProgress((current) =>
           current
@@ -459,21 +515,21 @@ export default function App() {
                 ...current,
                 active: false,
                 stage: "archive",
-                title: "故事创编完成",
-                detail: "已保存故事、非遗小知识和 Prompt 记录；需要插图时可以单页生成。"
+                title: "故事书已装订完成",
+                detail: "已保存故事、非遗小知识和创作记录；需要插图时可以单页补画。"
               }
             : current
         );
-        setNotice("故事创编完成：可以单页生成插图或查看 Prompt 记录");
+        setNotice("故事书已装订完成：可以单页补画插图或查看创作记录");
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : "绘本生成失败";
+      const message = error instanceof Error ? error.message : "绘本制作失败";
       setGenerationProgress((current) =>
         current
           ? {
               ...current,
               active: false,
-              title: "创编遇到问题",
+              title: "创作路上遇到一点问题",
               detail: message,
               error: message
             }
@@ -491,8 +547,8 @@ export default function App() {
         ? {
             ...current,
             stage: "images",
-            title: mode === "batch" ? "正在并行生成 4 页连贯插图" : `正在生成第 ${pageNumber} 页插图`,
-            detail: `第 ${pageNumber} 页正在调用百炼图片模型。`,
+            title: mode === "batch" ? "正在为故事页绘制插图" : `桂小灵正在画第 ${pageNumber} 页`,
+            detail: `第 ${pageNumber} 页插图马上就好啦。`,
             imageTasks: { ...current.imageTasks, [pageNumber]: "running" }
           }
         : current
@@ -509,7 +565,7 @@ export default function App() {
             }
           : current
       );
-      throw new Error(data.error || "插图生成失败");
+      throw new Error(data.error || "插图暂时没画好");
     }
 
     setActiveBook((current) => mergePictureBook(current, data.book!));
@@ -517,7 +573,7 @@ export default function App() {
       current
         ? {
             ...current,
-            detail: `第 ${pageNumber} 页插图已返回，正在继续等待其他页面。`,
+            detail: `第 ${pageNumber} 页插图已经放进绘本，桂小灵继续整理其他页面。`,
             imageTasks: { ...current.imageTasks, [pageNumber]: "done" }
           }
         : current
@@ -532,12 +588,12 @@ export default function App() {
 
     setIsGenerating(true);
     setGenerationProgress(
-      makeProgress("images", `正在生成第 ${pageNumber} 页插图`, `第 ${pageNumber} 页正在调用百炼图片模型。`, {
+      makeProgress("images", `桂小灵正在画第 ${pageNumber} 页`, `第 ${pageNumber} 页插图马上就好啦。`, {
         ...emptyImageTasks,
         [pageNumber]: "running"
       })
     );
-    setNotice(`正在为第 ${pageNumber} 页生成插图`);
+    setNotice(`桂小灵正在为第 ${pageNumber} 页绘制插图`);
     try {
       await generateImageForBook(activeBook.id, pageNumber, "single");
       await refreshBooks();
@@ -548,19 +604,19 @@ export default function App() {
               active: false,
               stage: "archive",
               title: `第 ${pageNumber} 页插图已更新`,
-              detail: "图片已保存到创编档案馆，可以继续重绘其他页面。"
+              detail: "插图已保存到我的绘本书架，可以继续换其他页面。"
             }
           : current
       );
       setNotice("插图已更新");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "插图生成失败";
+      const message = error instanceof Error ? error.message : "插图暂时没画好";
       setGenerationProgress((current) =>
         current
           ? {
               ...current,
               active: false,
-              title: "插图生成遇到问题",
+              title: "这一页暂时没画好",
               detail: message,
               error: message
             }
@@ -580,12 +636,12 @@ export default function App() {
       setActiveBook(null);
     }
     setGenerationProgress(null);
-    setNotice("作品已删除");
+    setNotice("绘本已从书架移走");
   }
 
   function startListening() {
     if (!speechSupported || isGenerating) {
-      setNotice("当前浏览器暂不支持语音识别，可以直接打字创编");
+      setNotice("当前浏览器暂不支持语音输入，可以直接打字做绘本");
       return;
     }
 
@@ -620,13 +676,13 @@ export default function App() {
     recognitionRef.current = recognition;
     recognition.start();
     setIsListening(true);
-    setNotice("我在听，请说出你的广西非遗文旅故事灵感");
+    setNotice("我在听，请说出你的广西非遗旅行故事灵感");
   }
 
   function stopListening() {
     recognitionRef.current?.stop();
     setIsListening(false);
-    setNotice("已停止语音输入，可以点击生成绘本");
+    setNotice("已收好声音灵感，可以开始做绘本");
   }
 
   const readText = activeBook ? buildReadText(activeBook) : "";
@@ -644,8 +700,8 @@ export default function App() {
               <Sparkles size={18} />
             </span>
             <div>
-              <p className="eyebrow">广西非遗文旅绘本</p>
-              <h1>桂韵创想家 <span>肖予曦开发</span></h1>
+              <p className="eyebrow">桂小灵的创作书桌</p>
+              <h1>桂韵创想家 <span>和桂小灵一起发现广西故事</span></h1>
             </div>
           </div>
 
@@ -653,18 +709,18 @@ export default function App() {
             <img src={companionRobot} alt="桂小灵" />
             <div className="mascot-badge">
               <Bot size={16} />
-              <span>{isGenerating ? "桂小灵创编中" : "桂小灵在这里"}</span>
+              <span>{isGenerating ? "桂小灵正在整理故事页" : "桂小灵陪你做绘本"}</span>
             </div>
           </div>
 
           <form className="idea-box" onSubmit={generateBook}>
-            <label htmlFor="idea">我的创编灵感</label>
+            <label htmlFor="idea">今天的故事灵感</label>
             <textarea
               id="idea"
               value={idea}
               onChange={(event) => setIdea(event.target.value)}
               disabled={isGenerating}
-              placeholder="说一句：我想写一个小朋友在三月三歌圩上遇到会唱山歌的绣球。"
+              placeholder="写下你想去的地方、想看的非遗，或一个小小的故事开头……"
             />
             <div className="language-switch" aria-label="绘本语言">
               <span>绘本语言</span>
@@ -688,7 +744,7 @@ export default function App() {
               </div>
             </div>
             <div className="language-switch" aria-label="主角角色">
-              <span>主角角色</span>
+              <span>主角小朋友</span>
               <div>
                 <button
                   type="button"
@@ -723,17 +779,17 @@ export default function App() {
                   checked={shouldGenerateImage}
                   onChange={(event) => setShouldGenerateImage(event.target.checked)}
                 />
-                并行生成 4 页插图
+                一起画好 4 页插图
               </label>
               <button className="primary-button" type="submit" disabled={!idea.trim() || isGenerating}>
                 {isGenerating ? <LoaderCircle size={18} /> : <Send size={18} />}
-                桂小灵创编绘本
+                {isGenerating ? "正在做绘本" : "开始做绘本"}
               </button>
             </div>
           </form>
 
           <div className="inspiration-list">
-            <p className="eyebrow">灵感提示</p>
+            <p className="eyebrow">灵感锦囊</p>
             <div>
               {inspirationChips.map((chip) => (
                 <button type="button" key={chip} onClick={() => setIdea(chip)}>
@@ -746,8 +802,8 @@ export default function App() {
           <div className="archive">
             <div className="section-heading">
               <div>
-                <p className="eyebrow">创编档案馆</p>
-                <h2>我的作品</h2>
+                <p className="eyebrow">我的绘本书架</p>
+                <h2>我的绘本书架</h2>
               </div>
               <button
                 className="icon-button"
@@ -768,9 +824,9 @@ export default function App() {
                     <button type="button" className="book-open" onClick={() => void openBook(book.id)}>
                       <BookOpen size={16} />
                       <span>
-                        <strong>{book.title}</strong>
+                        <strong>{softenDisplayText(book.title)}</strong>
                         <small>{formatDate(book.updatedAt)}</small>
-                        <em>{book.heritageElements.concat(book.tourismElements).slice(0, 4).join(" · ")}</em>
+                        <em>{book.heritageElements.concat(book.tourismElements).slice(0, 4).map(softenDisplayText).join(" · ")}</em>
                       </span>
                     </button>
                     <button
@@ -784,17 +840,17 @@ export default function App() {
                   </article>
                 ))
               ) : (
-                <p className="empty-state">还没有作品。生成第一本绘本后会自动保存。</p>
+                <p className="empty-state">还没有绘本。做完第一本后会自动放进书架。</p>
               )}
             </div>
           </div>
         </aside>
 
-        <section className="workbench">
+        <section className="workbench" ref={workbenchRef}>
           <header className="topbar">
             <div>
-              <p className="eyebrow">广西非遗 · 文旅 · 学生创编能力</p>
-              <h2>{activeBook?.title || "创编工作台"}</h2>
+              <p className="eyebrow">桂小灵绘本工坊</p>
+              <h2>{activeBook ? softenDisplayText(activeBook.title) : "桂小灵的绘本工坊"}</h2>
             </div>
             <div className="topbar-actions">
               <button className="secondary-button" type="button" onClick={() => void speakWithBrowser(readText, activeBook?.language || "zh")} disabled={!activeBook}>
@@ -802,14 +858,14 @@ export default function App() {
                 朗读绘本
               </button>
               {activeBook ? (
-                <a className="secondary-button" href={getPlayerHref(activeBook.id)} target="_blank" rel="noreferrer">
+                <a className="primary-button" href={getPlayerHref(activeBook.id)} target="_blank" rel="noreferrer">
                   <ExternalLink size={18} />
-                  正式播放
+                  打开故事书
                 </a>
               ) : null}
               <button className="secondary-button" type="button" onClick={() => setActiveTab(activeTab === "book" ? "prompts" : "book")} disabled={!activeBook}>
                 <FileText size={18} />
-                {activeTab === "book" ? "Prompt 记录" : "返回绘本"}
+                {activeTab === "book" ? "创作记录" : "返回绘本"}
               </button>
             </div>
           </header>
@@ -819,7 +875,7 @@ export default function App() {
             <span>{notice}</span>
           </div>
 
-          <div className="workbench-body">
+          <div className="workbench-body" ref={workbenchBodyRef}>
             {generationProgress ? <GenerationProgressPanel progress={generationProgress} /> : null}
             {generationProgress && activeBook && !generationProgress.active ? (
               <PostGenerateActions book={activeBook} onDismiss={() => setGenerationProgress(null)} />
@@ -834,7 +890,7 @@ export default function App() {
               <section className="empty-workbench">
                 <Paintbrush size={42} />
                 <h2>从一句灵感开始</h2>
-                <p>输入或说出一个广西非遗文旅故事，桂小灵会帮我生成 4 页绘本、连贯插图 Prompt、非遗小知识和小学生讲解词。</p>
+                <p>输入或说出一个广西非遗旅行故事，桂小灵会帮你整理成 4 页绘本、插图和小小讲解词。</p>
               </section>
             )}
           </div>
@@ -897,62 +953,63 @@ function getStepIcon(state: string) {
 
 function getImageTaskLabel(status: ImageTaskStatus) {
   if (status === "running") {
-    return "生成中";
+    return "绘制中";
   }
   if (status === "done") {
-    return "已完成";
+    return "已放入绘本";
   }
   if (status === "error") {
-    return "可重试";
+    return "可再画";
   }
   if (status === "queued") {
-    return "排队中";
+    return "等画纸";
   }
-  return "未开始";
+  return "待开始";
 }
 
 function getImageSourceLabel(page: PictureBookPage, taskStatus: ImageTaskStatus) {
   if (taskStatus === "running") {
-    return "生成中";
+    return "绘制中";
   }
   if (taskStatus === "error") {
-    return "可重试";
+    return "可再画";
   }
-  return page.imageSource === "bailian" ? "百炼图片" : "演示插图";
+  return page.imageSource === "bailian" ? "绘本插图" : "示意插图";
 }
 
 function getCulturePanelCopy(language: BookLanguage) {
   if (language === "en") {
     return {
       title: "Culture Mini-Guide",
-      subtitle: "The encyclopedia notes used for reading aloud and presentation",
+      subtitle: "Small discoveries pasted into the picture book",
       guideLabel: "Student Guide Script",
       noteLabel: "Page Notes"
     };
   }
 
   return {
-    title: "广西文化小百科",
-    subtitle: "朗读和展示都会用到的非遗文旅介绍",
-    guideLabel: "小小文旅讲解词",
-    noteLabel: "每页小知识"
+    title: "广西文化小知识",
+    subtitle: "贴在绘本里的非遗小发现",
+    guideLabel: "小小文旅推荐官",
+    noteLabel: "每页的小发现"
   };
 }
 
 function GenerationProgressPanel({ progress }: { progress: GenerationProgress }) {
   const percent = getProgressPercent(progress);
+  const hasImageTasks = Object.values(progress.imageTasks).some((status) => status !== "idle");
 
   return (
     <section className={`progress-panel ${progress.error ? "has-error" : ""}`} aria-live="polite">
       <div className="progress-head">
         <div>
-          <p className="eyebrow">创编进度</p>
-          <h3>{progress.title}</h3>
-          <p>{progress.detail}</p>
+          <p className="eyebrow">绘本制作进度</p>
+          <h3>{softenDisplayText(progress.title)}</h3>
+          <p>{softenDisplayText(progress.detail)}</p>
         </div>
         <div className="progress-timer">
           <Clock size={18} />
-          <span>已用 {progress.elapsedSeconds} 秒</span>
+          <span>陪伴 {progress.elapsedSeconds} 秒</span>
         </div>
       </div>
 
@@ -972,17 +1029,19 @@ function GenerationProgressPanel({ progress }: { progress: GenerationProgress })
         })}
       </div>
 
-      <div className="image-task-grid">
-        {[1, 2, 3, 4].map((pageNumber) => {
-          const status = progress.imageTasks[pageNumber] || "idle";
-          return (
-            <div className={`image-task ${status}`} key={pageNumber}>
-              <strong>第 {pageNumber} 页</strong>
-              <span>{getImageTaskLabel(status)}</span>
-            </div>
-          );
-        })}
-      </div>
+      {hasImageTasks ? (
+        <div className="image-task-grid">
+          {[1, 2, 3, 4].map((pageNumber) => {
+            const status = progress.imageTasks[pageNumber] || "idle";
+            return (
+              <div className={`image-task ${status}`} key={pageNumber}>
+                <strong>第 {pageNumber} 页</strong>
+                <span>{getImageTaskLabel(status)}</span>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -991,18 +1050,18 @@ function PostGenerateActions({ book, onDismiss }: { book: PictureBook; onDismiss
   return (
     <section className="post-generate-actions">
       <div>
-        <p className="eyebrow">故事已生成</p>
-        <h3>可以继续编辑，也可以进入正式播放页</h3>
-        <p>正式播放会打开一个专门用于展示绘本的大屏链接，适合比赛现场讲故事。</p>
+        <p className="eyebrow">绘本已经准备好啦</p>
+        <h3>故事书已装订完成</h3>
+        <p>可以继续慢慢读，也可以打开绘本剧场，适合比赛现场讲故事。</p>
       </div>
       <div>
         <button className="secondary-button" type="button" onClick={onDismiss}>
           <BookOpen size={18} />
-          查看该故事
+          继续看这本书
         </button>
         <a className="primary-button" href={getPlayerHref(book.id)} target="_blank" rel="noreferrer">
           <ExternalLink size={18} />
-          正式播放绘本
+          打开故事书
         </a>
       </div>
     </section>
@@ -1011,7 +1070,7 @@ function PostGenerateActions({ book, onDismiss }: { book: PictureBook; onDismiss
 
 function PictureBookPlayer({ book }: { book: PictureBook | null }) {
   const [pageIndex, setPageIndex] = useState(0);
-  const [includeCultureNote, setIncludeCultureNote] = useState(false);
+  const [includeCultureNote, setIncludeCultureNote] = useState(true);
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
   const autoPlayRef = useRef(false);
 
@@ -1031,11 +1090,11 @@ function PictureBookPlayer({ book }: { book: PictureBook | null }) {
       <main className="player-shell">
         <section className="player-loading">
           <LoaderCircle className="loading-spinner" size={34} />
-          <h1>正在打开正式播放页</h1>
-          <p>如果作品刚刚生成完成，请稍等片刻。</p>
+          <h1>正在打开绘本剧场</h1>
+          <p>如果作品刚刚装订完成，请稍等片刻。</p>
           <a className="secondary-button" href="#/">
             <Home size={18} />
-            返回创编工作台
+            返回书桌
           </a>
         </section>
       </main>
@@ -1057,7 +1116,7 @@ function PictureBookPlayer({ book }: { book: PictureBook | null }) {
     autoPlayRef.current = true;
     setIsAutoPlaying(true);
     try {
-      await speakWithBrowser(cleanSpeechPart(currentBook.title), language);
+      await speakWithBrowser(cleanSpeechPart(softenDisplayText(currentBook.title)), language);
       for (const [index, item] of pages.entries()) {
         if (!autoPlayRef.current) {
           break;
@@ -1082,14 +1141,14 @@ function PictureBookPlayer({ book }: { book: PictureBook | null }) {
   return (
     <main className="player-shell">
       <header className="player-header">
-        <a className="secondary-button" href="#/">
+        <a className="secondary-button player-back-button" href="#/">
           <Home size={18} />
-          返回工作台
+          返回书桌
         </a>
         <div>
-          <p className="eyebrow">正式播放绘本 · 肖予曦开发</p>
-          <h1>{book.title}</h1>
-          <p>{book.subtitle}</p>
+          <p className="eyebrow">桂小灵绘本剧场</p>
+          <h1>{softenDisplayText(book.title)}</h1>
+          <p>{softenDisplayText(book.subtitle)}</p>
         </div>
         <div className="player-header-actions">
           <label className="player-knowledge-toggle">
@@ -1098,11 +1157,11 @@ function PictureBookPlayer({ book }: { book: PictureBook | null }) {
               checked={includeCultureNote}
               onChange={(event) => setIncludeCultureNote(event.target.checked)}
             />
-            包含小百科
+            显示文化小贴士
           </label>
-          <button className="secondary-button" type="button" onClick={isAutoPlaying ? stopAutoPlay : () => void playAllPages()}>
+          <button className="primary-button player-read-button" type="button" onClick={isAutoPlaying ? stopAutoPlay : () => void playAllPages()}>
             <Volume2 size={18} />
-            {isAutoPlaying ? "停止播放" : "播放全书"}
+            {isAutoPlaying ? "停一下" : "朗读全书"}
           </button>
         </div>
       </header>
@@ -1115,20 +1174,22 @@ function PictureBookPlayer({ book }: { book: PictureBook | null }) {
             ) : (
               <div className="player-image-empty">
                 <Image size={46} />
-                <span>这页插图还在等待生成</span>
+                <span>这页插图还在等待绘制</span>
               </div>
             )}
           </div>
           <article className="player-copy">
-            <p className="eyebrow">
-              {language === "en" ? `Page ${currentPageNumber} / ${pageCount}` : `第 ${currentPageNumber} / ${pageCount} 页`}
+            <p className="player-page-stamp">
+              {language === "en" ? `Page ${currentPageNumber} of ${pageCount}` : `第 ${currentPageNumber} 页 · 共 ${pageCount} 页`}
             </p>
-            <h2>{page.title}</h2>
-            <p>{page.text}</p>
-            <div className="player-culture-note">
-              <strong>{language === "en" ? "Culture Mini-Guide" : "文化小百科"}</strong>
-              <span>{page.cultureNote}</span>
-            </div>
+            <h2>{softenDisplayText(page.title)}</h2>
+            <p>{softenDisplayText(page.text)}</p>
+            {includeCultureNote ? (
+              <div className="player-culture-note">
+                <strong>{language === "en" ? "Gui Xiaoling's Little Discovery" : "桂小灵的小发现"}</strong>
+                <span>{softenDisplayText(page.cultureNote)}</span>
+              </div>
+            ) : null}
             <div className="player-controls">
               <button className="secondary-button" type="button" onClick={() => setPageIndex((current) => Math.max(0, current - 1))} disabled={pageIndex === 0}>
                 <ChevronLeft size={18} />
@@ -1136,7 +1197,7 @@ function PictureBookPlayer({ book }: { book: PictureBook | null }) {
               </button>
               <button className="secondary-button" type="button" onClick={() => void speakWithBrowser(buildPageReadText(book, page, includeCultureNote), language)}>
                 <Volume2 size={18} />
-                朗读本页
+                听这一页
               </button>
               <button
                 className="secondary-button"
@@ -1154,22 +1215,26 @@ function PictureBookPlayer({ book }: { book: PictureBook | null }) {
         <section className="player-loading">
           <Paintbrush size={38} />
           <h1>这本绘本还没有页面</h1>
-          <p>请回到工作台重新生成故事。</p>
+          <p>请回到创作书桌重新整理故事。</p>
         </section>
       )}
 
-      <nav className="player-page-dots" aria-label="播放页码">
-        {pages.map((item, index) => (
-          <button
-            type="button"
-            className={index === pageIndex ? "active" : ""}
-            key={item.pageNumber}
-            onClick={() => setPageIndex(index)}
-            aria-label={language === "en" ? `Go to page ${index + 1}` : `跳到第 ${index + 1} 页`}
-          >
-            {index + 1}
-          </button>
-        ))}
+      <nav className="player-page-dots" aria-label="绘本页码">
+        <span>{language === "en" ? `Page ${currentPageNumber} of ${pageCount}` : `第 ${currentPageNumber} 页 · 共 ${pageCount} 页`}</span>
+        <div>
+          {pages.map((item, index) => (
+            <button
+              type="button"
+              className={index === pageIndex ? "active" : ""}
+              key={item.pageNumber}
+              onClick={() => setPageIndex(index)}
+              aria-label={language === "en" ? `Go to page ${index + 1}` : `翻到第 ${index + 1} 页`}
+              title={language === "en" ? `Page ${index + 1}` : `第 ${index + 1} 页`}
+            >
+              {index + 1}
+            </button>
+          ))}
+        </div>
       </nav>
     </main>
   );
@@ -1187,51 +1252,51 @@ function BookView({
   const language = book.language || "zh";
   const cultureCopy = getCulturePanelCopy(language);
   const cultureNotes = book.pages
-    .map((page) => ({ pageNumber: page.pageNumber, text: page.cultureNote.trim() }))
+    .map((page) => ({ pageNumber: page.pageNumber, text: softenDisplayText(page.cultureNote.trim()) }))
     .filter((item) => item.text);
 
   return (
     <div className="book-view">
       <section className="book-hero">
         <div>
-          <p className="eyebrow">AI 生成内容约 {book.aiContentRatio}%</p>
-          <h2>{book.title}</h2>
-          <p>{book.subtitle}</p>
+          <p className="eyebrow">故事内容已整理</p>
+          <h2>{softenDisplayText(book.title)}</h2>
+          <p>{softenDisplayText(book.subtitle)}</p>
         </div>
         <div className="tag-cluster">
           {book.heritageElements.map((item) => (
             <span className="heritage-tag" key={item}>
-              {item}
+              {softenDisplayText(item)}
             </span>
           ))}
           {book.tourismElements.map((item) => (
             <span className="tourism-tag" key={item}>
-              {item}
+              {softenDisplayText(item)}
             </span>
           ))}
           <a className="player-inline-link" href={getPlayerHref(book.id)} target="_blank" rel="noreferrer">
             <ExternalLink size={15} />
-            正式播放
+            开始读绘本
           </a>
         </div>
       </section>
 
       <section className="guide-grid">
         <article>
-          <h3>AI 追问我的创编问题</h3>
+          <h3>桂小灵的小问题</h3>
           <ul>
             {book.guidingQuestions.map((question) => (
-              <li key={question}>{question}</li>
+              <li key={question}>{softenDisplayText(question)}</li>
             ))}
           </ul>
         </article>
         <article>
-          <h3>故事大纲</h3>
-          <p>{book.outline}</p>
+          <h3>我的故事路线</h3>
+          <p>{softenDisplayText(book.outline)}</p>
         </article>
         <article>
           <h3>小小文旅推荐官</h3>
-          <p>{book.tourGuideScript}</p>
+          <p>{softenDisplayText(book.tourGuideScript)}</p>
         </article>
       </section>
 
@@ -1244,7 +1309,7 @@ function BookView({
         </div>
         <article className="culture-guide-card">
           <strong>{cultureCopy.guideLabel}</strong>
-          <p>{book.tourGuideScript}</p>
+          <p>{softenDisplayText(book.tourGuideScript)}</p>
         </article>
         {cultureNotes.length ? (
           <div className="culture-note-list">
@@ -1262,6 +1327,8 @@ function BookView({
       <section className="page-grid">
         {book.pages.map((page) => {
           const taskStatus = imageTasks?.[page.pageNumber] || "idle";
+          const imageButtonLabel =
+            taskStatus === "running" ? "桂小灵在画" : page.imageUrl ? "换一张插图" : "补画这一页";
           return (
             <article className={`page-card ${taskStatus === "running" ? "is-drawing" : ""}`} key={page.pageNumber}>
               <div className="page-image">
@@ -1270,22 +1337,22 @@ function BookView({
                 ) : (
                   <div className="image-waiting">
                     {taskStatus === "running" ? <LoaderCircle size={34} /> : <Image size={34} />}
-                    <span>{taskStatus === "running" ? "正在生成本页图片" : "等待生成插图"}</span>
+                    <span>{taskStatus === "running" ? "桂小灵正在画这一页……" : "这页还在等插图"}</span>
                   </div>
                 )}
                 <span>{getImageSourceLabel(page, taskStatus)}</span>
               </div>
               <div className="page-copy">
                 <p className="eyebrow">第 {page.pageNumber} 页</p>
-                <h3>{page.title}</h3>
-                <p>{page.text}</p>
+                <h3>{softenDisplayText(page.title)}</h3>
+                <p>{softenDisplayText(page.text)}</p>
                 <div className="culture-note">
-                  <strong>非遗小知识</strong>
-                  <span>{page.cultureNote}</span>
+                  <strong>小发现</strong>
+                  <span>{softenDisplayText(page.cultureNote)}</span>
                 </div>
                 <button className="secondary-button" type="button" onClick={() => void onGenerateImage(page.pageNumber)} disabled={taskStatus === "running"}>
                   {taskStatus === "running" ? <LoaderCircle size={16} /> : <RefreshCw size={16} />}
-                  {taskStatus === "running" ? "正在生成" : "生成本页插图"}
+                  {imageButtonLabel}
                 </button>
               </div>
             </article>
@@ -1294,8 +1361,8 @@ function BookView({
       </section>
 
       <section className="reflection">
-        <h3>我的创作反思</h3>
-        <p>{book.studentReflection}</p>
+        <h3>我的创作小记</h3>
+        <p>{softenDisplayText(book.studentReflection)}</p>
       </section>
     </div>
   );
@@ -1306,19 +1373,22 @@ function PromptView({ records }: { records: PromptRecord[] }) {
     <section className="prompt-view">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">Prompt 记录</p>
-          <h2>我的 AI 创作过程</h2>
+          <p className="eyebrow">灵感记录</p>
+          <h2>这本书的创作记录</h2>
         </div>
       </div>
       {records.map((record) => (
         <article className="prompt-card" key={record.id}>
           <div>
-            <span>{record.type}</span>
-            <strong>{record.label}</strong>
+            <span>{getRecordTypeLabel(record.type)}</span>
+            <strong>{softenRecordText(record.label)}</strong>
             <small>{formatDate(record.createdAt)}</small>
           </div>
-          <p className="prompt-text">{record.prompt}</p>
-          <p className="prompt-output">{record.output}</p>
+          <details>
+            <summary>查看当时的灵感说明</summary>
+            <p className="prompt-text">{softenRecordText(record.prompt)}</p>
+          </details>
+          <p className="prompt-output">{softenRecordText(record.output)}</p>
         </article>
       ))}
     </section>
