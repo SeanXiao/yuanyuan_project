@@ -374,6 +374,17 @@ function makeIllustrationPrompt(
   language: BookLanguage,
   protagonistGender: ProtagonistGender
 ) {
+  const noReadableTextRule =
+    language === "en"
+      ? [
+          "No readable text: do not draw Chinese characters, English letters, pinyin, numbers, punctuation, captions, speech bubbles, labels, signs, plaques, banners, page numbers, subtitles, watermarks, logos, UI, book text, paper notes, display boards, monument inscriptions, or any readable marks.",
+          "If the scene contains a sign, plaque, book, paper, banner, monument, or display board, render it blank, decorative, or unreadable."
+        ].join(" ")
+      : [
+          "画面无可读文字：不要画汉字、英文、拼音、数字、标点、字幕、对白气泡、标签、招牌、牌匾、横幅、页码、水印、Logo、界面文字、书页文字、纸条、展板、纪念碑文字或任何可读符号。",
+          "如果场景包含招牌、牌匾、书本、纸张、横幅、纪念碑或展板，请画成空白、装饰纹理或不可读纹理。"
+        ].join(" ");
+
   if (language === "en") {
     return [
       "Warm and bright children's picture book illustration, watercolor texture, one elementary-school protagonist, suitable for ages 6-12.",
@@ -383,7 +394,8 @@ function makeIllustrationPrompt(
       `Story scene: ${pageText}`,
       `Guangxi cultural highlights: ${heritage.join(", ")}.`,
       `Guangxi cultural tourism elements: ${tourism.join(", ")}.`,
-      "Layered composition, friendly expressions, Guangxi ethnic patterns, landscape and festival atmosphere, no text, no watermark, no real-person portrait."
+      "Layered composition, friendly expressions, Guangxi ethnic patterns, landscape and festival atmosphere, no real-person portrait.",
+      noReadableTextRule
     ].join("\n");
   }
 
@@ -395,7 +407,8 @@ function makeIllustrationPrompt(
     `故事画面：${pageText}`,
       `广西文化亮点：${heritage.join("、")}。`,
     `广西文旅元素：${tourism.join("、")}。`,
-    "画面有层次，角色表情友好，保留广西民族纹样、山水和节庆氛围，不要出现文字、水印或真实人物肖像。"
+    "画面有层次，角色表情友好，保留广西民族纹样、山水和节庆氛围，不要出现真实人物肖像。",
+    noReadableTextRule
   ].join("\n");
 }
 

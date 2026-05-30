@@ -393,6 +393,9 @@ h3 {
 .inspiration-list button,
 .heritage-tag,
 .tourism-tag {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
   border: 1px solid rgba(151, 130, 92, 0.18);
   border-radius: 999px;
   padding: 7px 11px;
@@ -401,6 +404,9 @@ h3 {
   box-shadow: 0 4px 10px rgba(77, 62, 38, 0.06);
   font-size: 0.82rem;
   font-weight: 850;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  text-align: left;
 }
 
 .inspiration-list button:hover {
@@ -844,13 +850,11 @@ h3 {
 .heritage-tag {
   color: #7e3426;
   background: #fff1ea;
-  transform: rotate(-1deg);
 }
 
 .tourism-tag {
   color: #2f785a;
   background: #eaf7ef;
-  transform: rotate(1deg);
 }
 
 .player-inline-link {

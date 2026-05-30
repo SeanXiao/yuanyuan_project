@@ -248,10 +248,27 @@ function protagonistVisualSpec(language: BookLanguage = "zh", gender: Protagonis
     : "小学生主角视觉锁定：一位 8-10 岁广西小学生女孩，默认以肖予曦女生角色为原型，明亮眼睛、友好表情，穿红蓝相间、带少量广西民族纹样点缀的小外套，背一个小书包。";
 }
 
+function textFreeImageRule(language: BookLanguage = "zh") {
+  if (language === "en") {
+    return [
+      "No readable text rule: the final illustration must contain zero readable characters.",
+      "Do not draw Chinese characters, English letters, pinyin, numbers, punctuation, captions, dialogue bubbles, labels, signs, plaques, banners, page numbers, subtitles, watermarks, logos, UI, book text, paper notes, museum panels, monuments, or inscriptions.",
+      "If the scene naturally contains a sign, plaque, book, paper, banner, monument, or display board, render it blank, decorative, or as unreadable texture only."
+    ].join(" ");
+  }
+
+  return [
+    "无文字画面规则：最终插图中不得出现任何可读字符。",
+    "不要画汉字、英文、拼音、数字、标点、字幕、对白气泡、标签、招牌、牌匾、横幅、页码、水印、Logo、界面文字、书页文字、纸条、展板、纪念碑文字或题字。",
+    "如果场景自然包含招牌、牌匾、书本、纸张、横幅、纪念碑或展板，请画成空白、装饰纹理或不可读纹理。"
+  ].join(" ");
+}
+
 function withCharacterImagePrompt(prompt = "", language: BookLanguage = "zh", protagonistGender: ProtagonistGender = "girl") {
   const namedPrompt = useGuiXiaolingName(prompt, language);
   const protagonistMarker = language === "en" ? "Student protagonist visual lock" : "小学生主角视觉锁定";
   const robotMarker = language === "en" ? "Gui Xiaoling visual lock" : "桂小灵视觉锁定";
+  const textRuleMarker = language === "en" ? "No readable text rule" : "无文字画面规则";
   const promptParts = [namedPrompt];
 
   if (!namedPrompt.includes(protagonistMarker)) {
@@ -260,6 +277,10 @@ function withCharacterImagePrompt(prompt = "", language: BookLanguage = "zh", pr
 
   if (!namedPrompt.includes(robotMarker)) {
     promptParts.push(guiXiaolingVisualSpec(language));
+  }
+
+  if (!namedPrompt.includes(textRuleMarker)) {
+    promptParts.push(textFreeImageRule(language));
   }
 
   return promptParts.filter(Boolean).join("\n");
@@ -794,7 +815,9 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
           "tourGuideScript: a cultural tourism guide script within 90 English words, suitable for an elementary-school student to read aloud",
           "studentReflection: student reflection within 45 English words",
           "aiContentRatio: number from 80 to 95",
-          "Image prompts should be in English or bilingual, suitable for children's picture books, watercolor or new-Chinese illustration style, with clear scene-matched Guangxi cultural elements. No text, watermark, or real-person portrait.",
+          "Image prompts should be in English or bilingual, suitable for children's picture books, watercolor or new-Chinese illustration style, with clear scene-matched Guangxi cultural elements.",
+          "Every image prompt must explicitly forbid readable text: no Chinese characters, English letters, pinyin, numbers, captions, dialogue bubbles, labels, signs, plaques, banners, page numbers, subtitles, watermarks, logos, UI, book text, paper notes, museum panels, monuments, or inscriptions. If a sign, plaque, book, paper, banner, monument, or display board appears, render it blank or unreadable.",
+          "Image prompts must not ask the image model to draw story paragraphs, page titles, explanations, labels, or cultural notes inside the picture.",
           `Image prompts must keep this student protagonist visual: ${protagonistVisualSpec("en", protagonistGender)}`,
           `Image prompts must use this exact companion role when Gui Xiaoling appears: ${guiXiaolingVisualSpec("en")}`,
           "The 4 image prompts must keep the same elementary-school protagonist, same outfit, same visual style, and continuous story mood. Only the scene and action change per page."
@@ -820,7 +843,9 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
           "tourGuideScript: 小学生能朗读的 120 字以内文旅讲解词",
           "studentReflection: 60 字以内学生创作反思",
           "aiContentRatio: 80 到 95 的数字",
-          "图片 Prompt 要适合儿童绘本、水彩或国潮插画风格，明确与当前场景贴合的广西文化元素，不要文字、水印、真实人物肖像。",
+          "图片 Prompt 要适合儿童绘本、水彩或国潮插画风格，明确与当前场景贴合的广西文化元素。",
+          "每页图片 Prompt 必须明确禁止可读文字：不要汉字、英文、拼音、数字、字幕、对白气泡、标签、招牌、牌匾、横幅、页码、水印、Logo、界面文字、书页文字、纸条、展板、纪念碑文字或题字；如果场景出现招牌、牌匾、书本、纸张、横幅、纪念碑或展板，只能画成空白或不可读纹理。",
+          "图片 Prompt 不得要求模型把故事正文、页标题、说明文字、文化小知识或标签画进图片里。",
           `图片 Prompt 必须保持这个小学生主角设定：${protagonistVisualSpec("zh", protagonistGender)}`,
           `图片 Prompt 必须使用这个画册机器人角色设定：${guiXiaolingVisualSpec("zh")}`,
           "4 页图片 Prompt 必须保持同一位小学生主角、同一套服装、同一绘本画风和连续故事氛围，只改变每页场景与动作。"
@@ -871,17 +896,10 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
   }
 }
 
-function escapeSvgText(text: string) {
-  return text.replace(/&/gu, "&amp;").replace(/</gu, "&lt;").replace(/>/gu, "&gt;").slice(0, 36);
-}
-
 async function createPlaceholderImage(book: PictureBook, page: PictureBookPage) {
   await mkdir(generatedDir, { recursive: true });
   const fileName = `${book.id}-page-${page.pageNumber}-placeholder.svg`;
   const filePath = join(generatedDir, fileName);
-  const cultureHighlights = escapeSvgText(book.heritageElements.join(" / "));
-  const tourism = escapeSvgText(book.tourismElements.join(" / "));
-  const title = escapeSvgText(page.title);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="900" viewBox="0 0 1280 900">
   <defs>
     <linearGradient id="sky" x1="0" x2="1" y1="0" y2="1">
@@ -898,6 +916,16 @@ async function createPlaceholderImage(book: PictureBook, page: PictureBookPage) 
   <path d="M0 695 C190 590 300 690 448 600 C620 496 740 660 910 548 C1058 450 1150 560 1280 486 L1280 900 L0 900 Z" fill="#5ab59a" opacity=".65"/>
   <path d="M0 750 C210 650 330 760 520 665 C700 575 820 730 1010 615 C1136 540 1210 610 1280 575 L1280 900 L0 900 Z" fill="#1f7c6a" opacity=".62"/>
   <circle cx="1010" cy="190" r="96" fill="#f7c64e" opacity=".86"/>
+  <g transform="translate(676 170)" opacity=".9">
+    <path d="M0 118 C96 44 188 52 278 110 C350 156 424 154 502 94 L502 300 L0 300 Z" fill="#fffaf0" opacity=".62"/>
+    <circle cx="82" cy="98" r="34" fill="#e9a83d" opacity=".7"/>
+    <circle cx="156" cy="78" r="18" fill="#c24735" opacity=".42"/>
+    <circle cx="248" cy="118" r="28" fill="#3e9b7c" opacity=".55"/>
+    <path d="M70 205 Q140 142 214 205 T362 205" fill="none" stroke="#2f785a" stroke-width="16" stroke-linecap="round" opacity=".55"/>
+    <path d="M98 258 Q178 206 258 258 T430 258" fill="none" stroke="#c24735" stroke-width="13" stroke-linecap="round" opacity=".34"/>
+    <rect x="314" y="56" width="110" height="130" rx="18" fill="#fff3cf" stroke="#8fbf9f" stroke-width="6" opacity=".76"/>
+    <path d="M342 84 h54M342 112 h54M342 140 h54" stroke="#8fbf9f" stroke-width="9" stroke-linecap="round" opacity=".5"/>
+  </g>
   <g transform="translate(170 245)">
     <circle cx="132" cy="124" r="82" fill="#fffaf0" stroke="#23343a" stroke-width="8"/>
     <circle cx="104" cy="112" r="11" fill="#23343a"/>
@@ -908,12 +936,14 @@ async function createPlaceholderImage(book: PictureBook, page: PictureBookPage) 
     <path d="M230 275 Q276 318 232 370" fill="none" stroke="#c24735" stroke-width="20" stroke-linecap="round"/>
     <path d="M98 274 h68 l-34 48 z" fill="#e8a83b"/>
   </g>
-  <g transform="translate(548 254)">
-    <rect x="0" y="0" width="530" height="322" rx="28" fill="#fffaf0" opacity=".94"/>
-    <text x="42" y="76" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="50" font-weight="700" fill="#23343a">${title}</text>
-    <text x="42" y="150" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="28" fill="#38625d">文化亮点：${cultureHighlights}</text>
-    <text x="42" y="210" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="28" fill="#38625d">文旅场景：${tourism}</text>
-    <text x="42" y="270" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="24" fill="#8a4e30">等待百炼图片生成时，使用本地演示插图</text>
+  <g transform="translate(548 254)" opacity=".94">
+    <rect x="0" y="0" width="530" height="322" rx="28" fill="#fffaf0"/>
+    <path d="M50 120 C118 34 210 64 260 132 C318 210 398 148 478 78" fill="none" stroke="#5ab59a" stroke-width="22" stroke-linecap="round" opacity=".42"/>
+    <path d="M56 216 C130 166 204 172 268 226 C334 282 414 266 478 202" fill="none" stroke="#f0ba49" stroke-width="20" stroke-linecap="round" opacity=".52"/>
+    <circle cx="112" cy="92" r="38" fill="#c24735" opacity=".18"/>
+    <circle cx="248" cy="166" r="52" fill="#3e9b7c" opacity=".18"/>
+    <circle cx="400" cy="112" r="34" fill="#e8a83b" opacity=".3"/>
+    <path d="M86 268 h360" stroke="#23343a" stroke-width="10" stroke-linecap="round" opacity=".08"/>
   </g>
 </svg>`;
   await writeFile(filePath, svg, "utf8");
@@ -1008,16 +1038,19 @@ function buildCoherentImagePrompt(book: PictureBook, page: PictureBookPage) {
     `统一伙伴角色设定：每页都让桂小灵作为画册机器人小伙伴自然出现在画面中。${guiXiaolingVisualSpec(book.language || "zh")}`,
     "统一画风：温暖明亮的儿童绘本插画，细腻水彩质感，柔和光线，广西民族纹样可以作为小面积装饰，画面适合小学组展示。",
     "文化呈现原则：只画当前页正文和文化提示里自然出现的文化亮点；有非遗就自然表现，没有非遗就表现风景、物产、农耕、城市生活等有意义内容，不要为了广西感额外加入壮锦、铜鼓或其他无关符号。",
-    "文字限制硬性要求：画面里绝对不要出现任何文字、汉字、英文字母、标题、横幅、标牌、页码、字幕、水印或 Logo；不要把下面的标题信息画进图片。",
+    textFreeImageRule(book.language || "zh"),
+    "文字限制硬性要求：下面的页标题、正文、文化提示、文化亮点和文旅元素只供理解故事，不是画面文字。绝对不要把任何句子、对白、说明牌、注释、地名、标题、标签或文化小知识画进图片。",
+    "场景物件限制：如果画面中有纪念馆、雕像底座、展板、路牌、门匾、书本、纸张、横幅或屏幕，请保持空白、纯色、图案纹理或不可读模糊纹理。",
     "统一限制：不要出现真实人物肖像；不要改变主角长相、年龄、服装和整体画风。",
     `全书文化亮点：${book.heritageElements.join("、")}`,
     `全文旅元素：${book.tourismElements.join("、")}`,
     `全书页目仅供角色一致性参考，不要画成分镜：${context}`,
     `当前只绘制第 ${page.pageNumber} 页对应的单个故事画面，页标题仅供理解，不得出现在画面中。`,
-    `当前页正文：${page.text}`,
-    `当前页文化提示：${page.cultureNote}`,
+    `当前页故事概要仅供理解，不得作为画中文字：${page.text}`,
+    `当前页文化提示仅供理解，不得作为画中文字：${page.cultureNote}`,
     "当前页原始图片 Prompt：",
-    cleanPageImagePrompt(page.imagePrompt)
+    cleanPageImagePrompt(page.imagePrompt),
+    "最终自检：整张图中不得出现任何可读字符，包括中文、拼音、英文、数字和标点。"
   ].join("\n");
 }
 
