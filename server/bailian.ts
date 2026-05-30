@@ -811,6 +811,7 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
           "pages: an array of exactly 4 pages. Each page includes pageNumber, title, text, imagePrompt, cultureNote",
           "Each page text should target 70-100 English words, child-friendly and easy to read aloud. The full book should feel like a rich picture-book read-aloud story, not a short outline.",
           "Each page should be storyboard-ready: one clear visual moment, one action, and one concrete Guangxi detail.",
+          "Each cultureNote must read like a child-friendly mini encyclopedia card, 28-45 English words. Explain what the page's Guangxi culture/place/ecology/food/craft/custom is, where it comes from or how it works, and why it is worth knowing. Prefer intangible heritage introductions when they naturally fit, but do not call ordinary scenery or animals intangible heritage.",
           "Every cultural highlight must have a story reason: place, festival, food, sound, character action, nature, or local life. Do not insert Zhuang brocade or bronze drums unless the student idea or chosen scene supports them.",
           "tourGuideScript: a cultural tourism guide script within 90 English words, suitable for an elementary-school student to read aloud",
           "studentReflection: student reflection within 45 English words",
@@ -839,6 +840,7 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
           "pages: 4 页数组，每页包含 pageNumber, title, text, imagePrompt, cultureNote",
           "每页正文以 140-180 个中文字为目标，尽量不要超过 190 字；整本要像真正绘本朗读故事，不要缩水成一句提纲，也不要只写说明文字。",
           "每页正文要适合直接画成插图：一个清楚画面、一个动作、一个具体广西细节。",
+          "每页 cultureNote 必须写成儿童版“小百科”卡片，45-70 个中文字。要介绍当前页最贴合的广西文化、非遗、地点、物产、生态或习俗：它是什么、来自哪里或怎么做、为什么值得知道。自然贴合时优先介绍非遗；如果只是动物、风景或城市记忆，不要硬说成非遗。",
           "每个文化亮点都必须有故事理由：地点、节日、食物、声音、人物行动、自然观察或当地生活。不要为了“广西感”强行加入壮锦或铜鼓，除非学生灵感或场景自然支持。",
           "tourGuideScript: 小学生能朗读的 120 字以内文旅讲解词",
           "studentReflection: 60 字以内学生创作反思",
@@ -1024,11 +1026,21 @@ function cleanPageImagePrompt(prompt = "") {
   return prompt.trim();
 }
 
+function visualOnlyPrompt(prompt = "") {
+  return cleanPageImagePrompt(prompt)
+    .split(/\r?\n/gu)
+    .map((line) => line.trim())
+    .filter((line) => line && !/cultureNote|文化提示|小百科|小发现|正文|Story scene|Page theme|页面主题|故事画面/iu.test(line))
+    .join("\n")
+    .trim();
+}
+
 function buildCoherentImagePrompt(book: PictureBook, page: PictureBookPage) {
   const protagonistGender = book.protagonistGender || "girl";
   const context = book.pages
-    .map((item) => `第${item.pageNumber}页《${item.title}》`)
+    .map((item) => `第${item.pageNumber}页`)
     .join("、");
+  const pageVisualPrompt = visualOnlyPrompt(page.imagePrompt);
   return [
     "请生成一张高质量儿童绘本插图，必须与同一本绘本的其他页保持连贯。",
     "画面格式硬性要求：只生成当前页的一张完整单幅插图。不要四宫格、不要漫画分镜、不要拼贴、多窗格、多张小图或缩略图合集。",
@@ -1037,19 +1049,18 @@ function buildCoherentImagePrompt(book: PictureBook, page: PictureBookPage) {
     `统一视觉设定：同一位小学生主角贯穿四页。${protagonistVisualSpec(book.language || "zh", protagonistGender)}`,
     `统一伙伴角色设定：每页都让桂小灵作为画册机器人小伙伴自然出现在画面中。${guiXiaolingVisualSpec(book.language || "zh")}`,
     "统一画风：温暖明亮的儿童绘本插画，细腻水彩质感，柔和光线，广西民族纹样可以作为小面积装饰，画面适合小学组展示。",
-    "文化呈现原则：只画当前页正文和文化提示里自然出现的文化亮点；有非遗就自然表现，没有非遗就表现风景、物产、农耕、城市生活等有意义内容，不要为了广西感额外加入壮锦、铜鼓或其他无关符号。",
+    "文化呈现原则：只画当前页视觉提示和文化元素里自然出现的内容；有非遗就自然表现，没有非遗就表现风景、物产、农耕、城市生活等有意义内容，不要为了广西感额外加入壮锦、铜鼓或其他无关符号。",
     textFreeImageRule(book.language || "zh"),
-    "文字限制硬性要求：下面的页标题、正文、文化提示、文化亮点和文旅元素只供理解故事，不是画面文字。绝对不要把任何句子、对白、说明牌、注释、地名、标题、标签或文化小知识画进图片。",
+    "文字限制硬性要求：故事正文、小百科、文化提示、页标题、标签和讲解词一律不提供给绘图模型，也绝对不能被画进图片。",
+    "图像只根据下面的视觉提示、角色设定和文化元素绘制，不要补充任何说明牌、注释、对白、地名、标题或百科文字。",
     "场景物件限制：如果画面中有纪念馆、雕像底座、展板、路牌、门匾、书本、纸张、横幅或屏幕，请保持空白、纯色、图案纹理或不可读模糊纹理。",
     "统一限制：不要出现真实人物肖像；不要改变主角长相、年龄、服装和整体画风。",
     `全书文化亮点：${book.heritageElements.join("、")}`,
     `全文旅元素：${book.tourismElements.join("、")}`,
-    `全书页目仅供角色一致性参考，不要画成分镜：${context}`,
-    `当前只绘制第 ${page.pageNumber} 页对应的单个故事画面，页标题仅供理解，不得出现在画面中。`,
-    `当前页故事概要仅供理解，不得作为画中文字：${page.text}`,
-    `当前页文化提示仅供理解，不得作为画中文字：${page.cultureNote}`,
-    "当前页原始图片 Prompt：",
-    cleanPageImagePrompt(page.imagePrompt),
+    `全书页码仅供角色一致性参考，不要画成分镜：${context}`,
+    `当前只绘制第 ${page.pageNumber} 页对应的单个故事画面，不要在画面里写页标题或页码。`,
+    "当前页视觉提示，只能当作画面构图参考，不得把其中任何词语画成文字：",
+    pageVisualPrompt || "小学生主角和桂小灵在广西场景中观察、体验和创作，画面表现一个清楚动作和一个地方文化细节。",
     "最终自检：整张图中不得出现任何可读字符，包括中文、拼音、英文、数字和标点。"
   ].join("\n");
 }

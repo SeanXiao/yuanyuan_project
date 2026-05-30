@@ -727,7 +727,7 @@ export default function App() {
               ...current,
               stage: "story",
               title: "正在整理故事",
-              detail: "桂小灵正在整理标题、4 页故事、文化小发现和小学生讲解词。"
+              detail: "桂小灵正在整理标题、4 页故事、文化小百科和小学生讲解词。"
             }
           : current
       );
@@ -790,7 +790,7 @@ export default function App() {
                 title: failedCount ? "故事书已装订完成，部分插图可再画" : "故事书已装订完成",
                 detail: failedCount
                   ? `有 ${failedCount} 页插图还没画好，故事已先放进绘本。`
-                  : "4 页故事、插图和文化小发现都已经放进绘本里了。",
+                  : "4 页故事、插图和文化小百科都已经放进绘本里了。",
                 error: failedCount ? "部分插图还没画好" : undefined
               }
             : current
@@ -806,7 +806,7 @@ export default function App() {
                 active: false,
                 stage: "archive",
                 title: "故事书已装订完成",
-                detail: "已保存故事、文化小发现和创作记录；需要插图时可以单页补画。"
+                detail: "已保存故事、文化小百科和创作记录；需要插图时可以单页补画。"
               }
             : current
         );
@@ -1341,17 +1341,17 @@ function getCulturePanelCopy(language: BookLanguage) {
   if (language === "en") {
     return {
       title: "Culture Mini-Guide",
-      subtitle: "Small discoveries pasted into the picture book",
+      subtitle: "Mini encyclopedia cards pasted into the picture book",
       guideLabel: "Student Guide Script",
-      noteLabel: "Page Notes"
+      noteLabel: "Page Mini Encyclopedia"
     };
   }
 
   return {
-    title: "广西文化小知识",
-    subtitle: "贴在绘本里的文化小发现",
+    title: "广西文化小百科",
+    subtitle: "贴在绘本里的百科卡片",
     guideLabel: "小小文旅推荐官",
-    noteLabel: "每页的小发现"
+    noteLabel: "每页小百科"
   };
 }
 
@@ -1364,7 +1364,7 @@ function getBookViewCopy(language: BookLanguage) {
       outlineTitle: "My Story Route",
       guideTitle: "Little Travel Guide",
       reflectionTitle: "My Creation Note",
-      discoveryLabel: "Little Discovery",
+      discoveryLabel: "Mini Encyclopedia",
       drawingButton: "Gui Xiaoling is drawing",
       redrawButton: "Try Another Illustration",
       drawButton: "Draw This Page",
@@ -1382,7 +1382,7 @@ function getBookViewCopy(language: BookLanguage) {
     outlineTitle: "我的故事路线",
     guideTitle: "小小文旅推荐官",
     reflectionTitle: "我的创作小记",
-    discoveryLabel: "小发现",
+    discoveryLabel: "小百科",
     drawingButton: "桂小灵在画",
     redrawButton: "换一张插图",
     drawButton: "补画这一页",
@@ -1398,11 +1398,11 @@ function getPlayerCopy(language: BookLanguage) {
     return {
       back: "Back to Studio",
       eyebrow: "Gui Xiaoling Picture Book Theater",
-      showCulture: "Show culture tips",
+      showCulture: "Show mini encyclopedia",
       stop: "Pause",
       readAll: "Read Full Book",
       waitingImage: "This page is waiting for an illustration",
-      discovery: "Gui Xiaoling's Little Discovery",
+      discovery: "Gui Xiaoling's Mini Encyclopedia",
       previous: "Previous",
       readPage: "Read This Page",
       next: "Next",
@@ -1414,11 +1414,11 @@ function getPlayerCopy(language: BookLanguage) {
   return {
     back: "返回书桌",
     eyebrow: "桂小灵绘本剧场",
-    showCulture: "显示文化小贴士",
+    showCulture: "显示文化小百科",
     stop: "停一下",
     readAll: "朗读全书",
     waitingImage: "这页插图还在等待绘制",
-    discovery: "桂小灵的小发现",
+    discovery: "桂小灵小百科",
     previous: "上一页",
     readPage: "听这一页",
     next: "下一页",

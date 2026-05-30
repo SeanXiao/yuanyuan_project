@@ -390,8 +390,8 @@ function makeIllustrationPrompt(
       "Warm and bright children's picture book illustration, watercolor texture, one elementary-school protagonist, suitable for ages 6-12.",
       protagonistVisualSpec(language, protagonistGender),
       guiXiaolingVisualSpec(language),
-      `Page theme: ${pageTitle}.`,
-      `Story scene: ${pageText}`,
+      "Visual concept: one child-friendly Guangxi picture-book scene, not a written title.",
+      "Show one clear action with the student protagonist and Gui Xiaoling in a Guangxi scene. Do not render story paragraphs, encyclopedia notes, captions, signs, or labels.",
       `Guangxi cultural highlights: ${heritage.join(", ")}.`,
       `Guangxi cultural tourism elements: ${tourism.join(", ")}.`,
       "Layered composition, friendly expressions, Guangxi ethnic patterns, landscape and festival atmosphere, no real-person portrait.",
@@ -403,8 +403,8 @@ function makeIllustrationPrompt(
     "儿童绘本插图，温暖明亮的水彩风格，小学生主角，画面适合 6-12 岁儿童。",
     protagonistVisualSpec(language, protagonistGender),
     guiXiaolingVisualSpec(language),
-    `页面主题：${pageTitle}。`,
-    `故事画面：${pageText}`,
+    "本页视觉概念：一个适合儿童绘本的广西场景，不提供可写进画面的标题。",
+    "只画小学生主角和桂小灵在广西场景中的一个清楚动作，不要渲染故事正文、小百科、字幕、招牌或标签。",
       `广西文化亮点：${heritage.join("、")}。`,
     `广西文旅元素：${tourism.join("、")}。`,
     "画面有层次，角色表情友好，保留广西民族纹样、山水和节庆氛围，不要出现真实人物肖像。",
@@ -517,7 +517,7 @@ function makeChineseFallbackPages(
     },
     {
       title: "我的创编绘本",
-      text: `最后，我把今天的冒险创编成一本绘本，也把${tourism[1]}介绍给更多同学。每个文化小发现都出现在最适合它的地方，主角的心情也从好奇、观察、分享，慢慢变成了想继续探索广西的勇气。`
+      text: `最后，我把今天的冒险创编成一本绘本，也把${tourism[1]}介绍给更多同学。每个文化小百科都出现在最适合它的地方，主角的心情也从好奇、观察、分享，慢慢变成了想继续探索广西的勇气。`
     }
   ];
 }
@@ -613,7 +613,7 @@ export function createFallbackBook(idea: string, language: BookLanguage = "zh", 
     studentReflection: "我发现文化亮点不是硬塞进故事里的标签，而是要从地点、人物和情节里自然长出来。",
     aiContentRatio: 88,
     promptRecords: [
-      makePromptRecord("story", "故事生成 Prompt", storyPrompt, "已生成 4 页绘本故事、大纲、文旅讲解和文化小发现。"),
+      makePromptRecord("story", "故事生成 Prompt", storyPrompt, "已生成 4 页绘本故事、大纲、文旅讲解和文化小百科。"),
       ...pages.map((page) => makePromptRecord("image", `第 ${page.pageNumber} 页图片 Prompt`, page.imagePrompt, "等待图片生成或使用本地演示插图。"))
     ]
   };
