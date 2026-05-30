@@ -4,6 +4,7 @@ dist/
 .env.*
 !.env.example
 data/*.json
+data/generated/
 data/sessions/
 *.log
 .DS_Store

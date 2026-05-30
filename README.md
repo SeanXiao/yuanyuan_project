@@ -9,6 +9,8 @@
 - 文字转语音：通过 MiniMax 同步语音合成接口 `https://api.minimaxi.com/v1/t2a_v2`。
 - 真人感声音：默认使用 `speech-2.8-hd` 和 `Chinese (Mandarin)_Warm_Girl`，语速偏快，并在合成文本里加入轻微停顿；如果 MiniMax 语音额度不足，会自动切换到浏览器里更自然的中文声音。
 - 记忆：自动记住“我叫……”“我喜欢……”“请记住……”等信息，保存在 `data/memory.json`。
+- Transaction 对话记录：每次对话会保存在 `data/transactions.json`，可以在网页左侧看到列表、打开继续对话，也可以删除某个历史 transaction。
+- 桂韵创想家：通过阿里云百炼高质量模型生成广西非遗文旅绘本。默认文本模型为 `qwen3.7-max`，图片模型为 `wan2.7-image-pro`，生成作品时会并行生成 4 页连贯插图。
 - 安全：API key 只放在后端环境变量中，前端不会暴露 key。
 
 ## 运行
@@ -28,6 +30,10 @@ MINIMAX_MODEL=MiniMax-M2.7
 MINIMAX_TTS_MODEL=speech-2.8-hd
 MINIMAX_TTS_VOICE="Chinese (Mandarin)_Warm_Girl"
 PORT=8787
+DASHSCOPE_API_KEY=你的_阿里云百炼_key
+BAILIAN_TEXT_MODEL=qwen3.7-max
+BAILIAN_IMAGE_MODEL=wan2.7-image-pro
+BAILIAN_IMAGE_SIZE=2K
 ```
 
 3. 启动：
