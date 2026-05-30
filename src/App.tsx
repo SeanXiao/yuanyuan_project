@@ -73,13 +73,6 @@ type PictureBookSummary = {
   coverImageUrl: string;
 };
 
-type BailianStatus = {
-  configured: boolean;
-  textModel: string;
-  imageModel: string;
-  imageSize: string;
-};
-
 type BookLanguage = "zh" | "en";
 
 type ImageTaskStatus = "idle" | "queued" | "running" | "done" | "error";
@@ -239,9 +232,9 @@ function buildReadText(book: PictureBook) {
   return `${parts.join(separator)}${endMark}`;
 }
 
-function buildPageReadText(book: PictureBook, page: PictureBookPage) {
+function buildPageReadText(book: PictureBook, page: PictureBookPage, includeCultureNote = false) {
   const language = book.language || "zh";
-  const parts = [page.title, page.text, page.cultureNote].map(cleanSpeechPart).filter(Boolean);
+  const parts = [page.title, page.text, includeCultureNote ? page.cultureNote : ""].map(cleanSpeechPart).filter(Boolean);
   const separator = language === "en" ? ". " : "。";
   const endMark = language === "en" ? "." : "。";
   return `${parts.join(separator)}${endMark}`;
@@ -292,10 +285,13 @@ export default function App() {
   const [shouldGenerateImage, setShouldGenerateImage] = useState(true);
   const [bookLanguage, setBookLanguage] = useState<BookLanguage>("zh");
   const [activeTab, setActiveTab] = useState<"book" | "prompts">("book");
-  const [bailianStatus, setBailianStatus] = useState<BailianStatus | null>(null);
   const [generationProgress, setGenerationProgress] = useState<GenerationProgress | null>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const speechSupported = Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
+
+  useEffect(() => {
+    document.title = route.mode === "player" ? "桂韵创想家正式播放 - 肖予曦开发" : "桂韵创想家 - 肖予曦开发";
+  }, [route.mode]);
 
   useEffect(() => {
     const handleHashChange = () => setRoute(getAppRoute());
@@ -305,10 +301,6 @@ export default function App() {
 
   useEffect(() => {
     void refreshBooks();
-    fetch("/api/bailian/status")
-      .then((response) => response.json())
-      .then((data: BailianStatus) => setBailianStatus(data))
-      .catch(() => setBailianStatus(null));
   }, []);
 
   useEffect(() => {
@@ -648,8 +640,7 @@ export default function App() {
             </span>
             <div>
               <p className="eyebrow">广西非遗文旅绘本</p>
-              <h1>桂韵创想家</h1>
-              <p className="subtitle">用 AI 创编广西非遗文旅绘本</p>
+              <h1>桂韵创想家 <span>肖予曦开发</span></h1>
             </div>
           </div>
 
@@ -659,12 +650,6 @@ export default function App() {
               <Bot size={16} />
               <span>{isGenerating ? "桂小灵创编中" : "桂小灵在这里"}</span>
             </div>
-          </div>
-
-          <div className={`model-status ${bailianStatus?.configured ? "ready" : "missing"}`}>
-            <strong>{bailianStatus?.configured ? "百炼正式模型已启用" : "未配置百炼 Key"}</strong>
-            <span>文本：{bailianStatus?.textModel || "qwen3.7-max"}</span>
-            <span>图片：{bailianStatus?.imageModel || "wan2.7-image-pro"} · {bailianStatus?.imageSize || "2K"}</span>
           </div>
 
           <form className="idea-box" onSubmit={generateBook}>
@@ -1000,10 +985,20 @@ function PostGenerateActions({ book, onDismiss }: { book: PictureBook; onDismiss
 
 function PictureBookPlayer({ book }: { book: PictureBook | null }) {
   const [pageIndex, setPageIndex] = useState(0);
+  const [includeCultureNote, setIncludeCultureNote] = useState(false);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(false);
+  const autoPlayRef = useRef(false);
 
   useEffect(() => {
     setPageIndex(0);
   }, [book?.id]);
+
+  useEffect(() => {
+    return () => {
+      autoPlayRef.current = false;
+      window.speechSynthesis?.cancel();
+    };
+  }, []);
 
   if (!book) {
     return (
@@ -1021,11 +1016,42 @@ function PictureBookPlayer({ book }: { book: PictureBook | null }) {
     );
   }
 
+  const currentBook = book;
   const language = book.language || "zh";
   const pages = book.pages.length ? book.pages : [];
   const page = pages[Math.min(pageIndex, Math.max(pages.length - 1, 0))];
   const pageCount = pages.length;
   const currentPageNumber = page ? pageIndex + 1 : 0;
+
+  async function playAllPages() {
+    if (!pages.length || isAutoPlaying) {
+      return;
+    }
+
+    autoPlayRef.current = true;
+    setIsAutoPlaying(true);
+    try {
+      await speakWithBrowser(cleanSpeechPart(currentBook.title), language);
+      for (const [index, item] of pages.entries()) {
+        if (!autoPlayRef.current) {
+          break;
+        }
+        setPageIndex(index);
+        await new Promise((resolve) => window.setTimeout(resolve, 260));
+        await speakWithBrowser(buildPageReadText(currentBook, item, includeCultureNote), language);
+        await new Promise((resolve) => window.setTimeout(resolve, 360));
+      }
+    } finally {
+      autoPlayRef.current = false;
+      setIsAutoPlaying(false);
+    }
+  }
+
+  function stopAutoPlay() {
+    autoPlayRef.current = false;
+    setIsAutoPlaying(false);
+    window.speechSynthesis?.cancel();
+  }
 
   return (
     <main className="player-shell">
@@ -1035,14 +1061,24 @@ function PictureBookPlayer({ book }: { book: PictureBook | null }) {
           返回工作台
         </a>
         <div>
-          <p className="eyebrow">正式播放绘本</p>
+          <p className="eyebrow">正式播放绘本 · 肖予曦开发</p>
           <h1>{book.title}</h1>
           <p>{book.subtitle}</p>
         </div>
-        <button className="secondary-button" type="button" onClick={() => void speakWithBrowser(buildReadText(book), language)}>
-          <Volume2 size={18} />
-          朗读全书
-        </button>
+        <div className="player-header-actions">
+          <label className="player-knowledge-toggle">
+            <input
+              type="checkbox"
+              checked={includeCultureNote}
+              onChange={(event) => setIncludeCultureNote(event.target.checked)}
+            />
+            包含小百科
+          </label>
+          <button className="secondary-button" type="button" onClick={isAutoPlaying ? stopAutoPlay : () => void playAllPages()}>
+            <Volume2 size={18} />
+            {isAutoPlaying ? "停止播放" : "播放全书"}
+          </button>
+        </div>
       </header>
 
       {page ? (
@@ -1072,7 +1108,7 @@ function PictureBookPlayer({ book }: { book: PictureBook | null }) {
                 <ChevronLeft size={18} />
                 上一页
               </button>
-              <button className="secondary-button" type="button" onClick={() => void speakWithBrowser(buildPageReadText(book, page), language)}>
+              <button className="secondary-button" type="button" onClick={() => void speakWithBrowser(buildPageReadText(book, page, includeCultureNote), language)}>
                 <Volume2 size={18} />
                 朗读本页
               </button>

@@ -71,7 +71,7 @@ export function createFallbackBook(idea: string, language: BookLanguage = "zh"):
     const pageTexts = [
       `I shared my idea with Gui Xiaoling, and ${heritage[0]} suddenly began to glow like a tiny doorway into a Guangxi story.`,
       `We arrived at ${tourism[0]}, where the wind carried mountain songs and the colors of ${heritage[1]} across the path.`,
-      `On the road, I met a friend who wanted to know Guangxi better. With AI's help, I introduced ${heritage[0]} and ${heritage[2]} in my own words.`,
+      `On the road, I met a friend who wanted to know Guangxi better. With Gui Xiaoling's help, I introduced ${heritage[0]} and ${heritage[2]} in my own words.`,
       `At the end, I turned the journey into a picture book and shared ${tourism[1]} and ${heritage.join(", ")} with more classmates.`
     ];
     const titles = ["A Bright Idea", "Into Guangxi", "Little Culture Guide", "My Picture Book"];
@@ -119,9 +119,9 @@ export function createFallbackBook(idea: string, language: BookLanguage = "zh"):
       : "会唱山歌的绣球";
 
   const pageTexts = [
-    `我把自己的灵感说给小圆听，${heritage[0]}忽然亮了起来，好像在邀请我走进一个广西故事。`,
+    `我把自己的灵感说给桂小灵听，${heritage[0]}忽然亮了起来，好像在邀请我走进一个广西故事。`,
     `我们来到了${tourism[0]}，风里传来${heritage[1]}和山歌的声音，每一步都像翻开一页新的绘本。`,
-    `路上，我遇到一个想了解广西文化的小伙伴。我用 AI 帮我整理的词语，向他介绍${heritage[0]}和${heritage[2]}。`,
+    `路上，我遇到一个想了解广西文化的小伙伴。我用桂小灵帮我整理的词语，向他介绍${heritage[0]}和${heritage[2]}。`,
     `最后，我把今天的冒险创编成一本绘本，也把${tourism[1]}和${heritage.join("、")}介绍给更多同学。`
   ];
 
@@ -154,7 +154,7 @@ export function createFallbackBook(idea: string, language: BookLanguage = "zh"):
     outline: `主角从一句灵感出发，在${tourism.join("、")}之间冒险，认识${heritage.join("、")}，最后完成自己的广西非遗文旅绘本。`,
     pages,
     tourGuideScript: `大家好，我是小小文旅推荐官。今天我想介绍${tourism.join("和")}，还想告诉大家${heritage.join("、")}这些广西文化元素。欢迎大家来广西，把旅途中的发现也创编成自己的故事。`,
-    studentReflection: "我先说出灵感，再和 AI 一起追问、选择、修改，把广西文化变成了自己的原创绘本。",
+    studentReflection: "我先说出灵感，再和桂小灵一起追问、选择、修改，把广西文化变成了自己的原创绘本。",
     aiContentRatio: 88,
     promptRecords: [
       makePromptRecord("story", "故事生成 Prompt", storyPrompt, "已生成 4 页绘本故事、大纲、文旅讲解和非遗知识。"),

@@ -68,6 +68,27 @@ function extractJson(text: string) {
   return JSON.parse(cleaned.slice(start, end + 1)) as BookDraft;
 }
 
+function useGuiXiaolingName(text = "", language: BookLanguage = "zh") {
+  if (!text) {
+    return text;
+  }
+
+  if (language === "en") {
+    return text
+      .replace(/\bAI\s+(assistant|helper|companion|robot)\b/giu, "Gui Xiaoling")
+      .replace(/\bthe\s+assistant\b/giu, "Gui Xiaoling")
+      .replace(/\bmy\s+assistant\b/giu, "Gui Xiaoling")
+      .replace(/\bXiaoyuan\b/giu, "Gui Xiaoling");
+  }
+
+  return text
+    .replace(/AI\s*小助手/gu, "桂小灵")
+    .replace(/AI\s*助手/gu, "桂小灵")
+    .replace(/智能小助手/gu, "桂小灵")
+    .replace(/小助手/gu, "桂小灵")
+    .replace(/小圆/gu, "桂小灵");
+}
+
 async function chatCompletion(messages: ChatMessage[]) {
   if (!dashScopeKey()) {
     throw new Error("DASHSCOPE_API_KEY is missing");
@@ -108,25 +129,25 @@ function normalizeDraft(idea: string, draft: BookDraft, language: BookLanguage):
   const pages = Array.isArray(draft.pages) && draft.pages.length ? draft.pages.slice(0, 4) : fallback.pages;
 
   return {
-    title: draft.title || fallback.title,
-    subtitle: draft.subtitle || fallback.subtitle,
+    title: useGuiXiaolingName(draft.title || fallback.title, language),
+    subtitle: useGuiXiaolingName(draft.subtitle || fallback.subtitle, language),
     originalIdea: idea,
     language,
-    heritageElements: (draft.heritageElements || fallback.heritageElements).slice(0, 5),
-    tourismElements: (draft.tourismElements || fallback.tourismElements).slice(0, 5),
-    guidingQuestions: (draft.guidingQuestions || fallback.guidingQuestions).slice(0, 3),
-    outline: draft.outline || fallback.outline,
+    heritageElements: (draft.heritageElements || fallback.heritageElements).slice(0, 5).map((item) => useGuiXiaolingName(item, language)),
+    tourismElements: (draft.tourismElements || fallback.tourismElements).slice(0, 5).map((item) => useGuiXiaolingName(item, language)),
+    guidingQuestions: (draft.guidingQuestions || fallback.guidingQuestions).slice(0, 3).map((item) => useGuiXiaolingName(item, language)),
+    outline: useGuiXiaolingName(draft.outline || fallback.outline, language),
     pages: pages.map((page, index) => ({
       pageNumber: index + 1,
-      title: page.title || fallback.pages[index]?.title || `第 ${index + 1} 页`,
-      text: page.text || fallback.pages[index]?.text || "",
-      imagePrompt: page.imagePrompt || fallback.pages[index]?.imagePrompt || "",
+      title: useGuiXiaolingName(page.title || fallback.pages[index]?.title || `第 ${index + 1} 页`, language),
+      text: useGuiXiaolingName(page.text || fallback.pages[index]?.text || "", language),
+      imagePrompt: useGuiXiaolingName(page.imagePrompt || fallback.pages[index]?.imagePrompt || "", language),
       imageUrl: page.imageUrl || "",
       imageSource: page.imageSource || "placeholder",
-      cultureNote: page.cultureNote || fallback.pages[index]?.cultureNote || ""
+      cultureNote: useGuiXiaolingName(page.cultureNote || fallback.pages[index]?.cultureNote || "", language)
     })),
-    tourGuideScript: draft.tourGuideScript || fallback.tourGuideScript,
-    studentReflection: draft.studentReflection || fallback.studentReflection,
+    tourGuideScript: useGuiXiaolingName(draft.tourGuideScript || fallback.tourGuideScript, language),
+    studentReflection: useGuiXiaolingName(draft.studentReflection || fallback.studentReflection, language),
     aiContentRatio: Number(draft.aiContentRatio || 90)
   };
 }
@@ -143,6 +164,7 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
           "You are the AI creative coach for Guiyun Creator, serving elementary-school students.",
           "Task: Turn a student's one-sentence idea into a Guangxi intangible-heritage and cultural-tourism AI picture book.",
           "Perspective: Write from the student's point of view, emphasizing 'I create together with AI'. Do not sound like an adult managing a child.",
+          "Companion character: whenever the AI helper or robot helper appears in the story, its name must be Gui Xiaoling. Do not write generic names such as AI assistant, AI helper, assistant, or Xiaoyuan.",
           "Content: Combine Guangxi intangible cultural heritage, cultural tourism, ethnic culture, and creative-writing growth.",
           "Safety: Suitable for ages 6-12. Avoid danger, horror, adult content, ads, or invented policy claims.",
           "Language: All reader-facing story fields must be in natural English. Guangxi names may keep Chinese proper nouns with simple English explanation when useful.",
@@ -152,6 +174,7 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
           "你是“桂韵创想家”的 AI 创编导师，服务对象是小学组学生。",
           "任务：根据学生的一句话灵感，生成广西非遗文旅 AI 绘本。",
           "视角：必须使用学生视角，强调“我和 AI 一起创作”，不要写成成人管理孩子。",
+          "伙伴角色：如果故事里出现帮助我的 AI 或机器人助手，名字必须是“桂小灵”，不要写“AI小助手”“AI助手”“小助手”“小圆”。",
           "内容：融合广西非遗、文旅、民族文化和创编能力训练。",
           "安全：适合 6-12 岁儿童，不出现危险、恐怖、成人化、商业广告或编造政策内容。",
           "语言：所有面向读者的故事字段必须使用自然中文。",
@@ -167,6 +190,7 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
           "subtitle: one short subtitle in English",
           "originalIdea: original idea",
           "language: exactly \"en\"",
+          "If a helper robot appears in the story, call it Gui Xiaoling every time.",
           "heritageElements: 2-5 Guangxi intangible heritage / ethnic culture elements",
           "tourismElements: 2-5 Guangxi cultural tourism elements",
           "guidingQuestions: 2-3 questions that help the student continue creating, in English",
@@ -186,6 +210,7 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
           "subtitle: 一句副标题",
           "originalIdea: 原始灵感",
           "language: 固定为 \"zh\"",
+          "如果故事里出现帮助我的机器人或 AI 伙伴，请每次都称呼它为“桂小灵”。",
           "heritageElements: 2-5 个广西非遗/民族文化元素",
           "tourismElements: 2-5 个广西文旅元素",
           "guidingQuestions: 2-3 个用于启发学生继续创编的问题",
