@@ -49,6 +49,7 @@ type PictureBook = {
   subtitle: string;
   originalIdea: string;
   language?: BookLanguage;
+  protagonistGender?: ProtagonistGender;
   createdAt: string;
   updatedAt: string;
   heritageElements: string[];
@@ -68,12 +69,15 @@ type PictureBookSummary = {
   subtitle: string;
   updatedAt: string;
   language?: BookLanguage;
+  protagonistGender?: ProtagonistGender;
   heritageElements: string[];
   tourismElements: string[];
   coverImageUrl: string;
 };
 
 type BookLanguage = "zh" | "en";
+
+type ProtagonistGender = "girl" | "boy";
 
 type ImageTaskStatus = "idle" | "queued" | "running" | "done" | "error";
 
@@ -284,6 +288,7 @@ export default function App() {
   const [isListening, setIsListening] = useState(false);
   const [shouldGenerateImage, setShouldGenerateImage] = useState(true);
   const [bookLanguage, setBookLanguage] = useState<BookLanguage>("zh");
+  const [protagonistGender, setProtagonistGender] = useState<ProtagonistGender>("girl");
   const [activeTab, setActiveTab] = useState<"book" | "prompts">("book");
   const [generationProgress, setGenerationProgress] = useState<GenerationProgress | null>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -387,7 +392,7 @@ export default function App() {
       const response = await fetch("/api/picture-books/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idea: cleanIdea, language: bookLanguage, generateImage: false })
+        body: JSON.stringify({ idea: cleanIdea, language: bookLanguage, protagonistGender, generateImage: false })
       });
       const data = (await response.json()) as { book?: PictureBook; books?: PictureBookSummary[]; error?: string };
       if (!response.ok || !data.book) {
@@ -679,6 +684,27 @@ export default function App() {
                   disabled={isGenerating}
                 >
                   English
+                </button>
+              </div>
+            </div>
+            <div className="language-switch" aria-label="主角角色">
+              <span>主角角色</span>
+              <div>
+                <button
+                  type="button"
+                  className={protagonistGender === "girl" ? "active" : ""}
+                  onClick={() => setProtagonistGender("girl")}
+                  disabled={isGenerating}
+                >
+                  女孩
+                </button>
+                <button
+                  type="button"
+                  className={protagonistGender === "boy" ? "active" : ""}
+                  onClick={() => setProtagonistGender("boy")}
+                  disabled={isGenerating}
+                >
+                  男孩
                 </button>
               </div>
             </div>

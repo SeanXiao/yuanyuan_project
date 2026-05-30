@@ -4,7 +4,8 @@ import {
   nowIso,
   type BookLanguage,
   type PictureBook,
-  type PictureBookPage
+  type PictureBookPage,
+  type ProtagonistGender
 } from "./bookStore.js";
 
 const heritageElements = [
@@ -35,10 +36,45 @@ function pickElements(idea: string, candidates: string[], count: number) {
   return merged.slice(0, count);
 }
 
-function makeIllustrationPrompt(pageTitle: string, pageText: string, heritage: string[], tourism: string[], language: BookLanguage) {
+function guiXiaolingVisualSpec(language: BookLanguage) {
+  if (language === "en") {
+    return [
+      "Gui Xiaoling visual lock: Gui Xiaoling is the picture-book companion robot, a cute glossy white-and-blue round robot mascot with a glowing cyan face and heart, headset microphone, friendly childlike smile, blue cape, and toy-like proportions.",
+      "Guangxi details: indigo Zhuang-style headscarf with teal, white, red, and gold brocade trim, small silver-inspired charm, Zhuang brocade patterns on cuffs/cape/notebook, and bronze-drum medallions on the chest and notebook."
+    ].join(" ");
+  }
+
+  return [
+    "桂小灵视觉锁定：桂小灵是画册里的固定机器人伙伴，可爱的白蓝配色圆润机器人吉祥物，黑色发光屏幕脸、青蓝色笑脸和爱心灯、耳麦、蓝色披风，整体像柔和精致的玩具机器人。",
+    "广西特色细节：靛蓝壮族风格头巾，带青蓝、白、红、金色壮锦几何边纹，头巾结旁有轻巧银饰小挂件；袖口、披风、本子有壮锦纹样，胸口和本子有铜鼓纹饰徽章。"
+  ].join(" ");
+}
+
+function protagonistVisualSpec(language: BookLanguage, gender: ProtagonistGender) {
+  if (language === "en") {
+    return gender === "boy"
+      ? "Student protagonist: one 8-10 year-old Guangxi elementary-school boy, bright eyes, friendly expression, simple red-blue jacket with subtle Zhuang brocade details, small backpack."
+      : "Student protagonist: one 8-10 year-old Guangxi elementary-school girl, inspired by Xiaoyuxi as the default girl role, bright eyes, friendly expression, simple red-blue jacket with subtle Zhuang brocade details, small backpack.";
+  }
+
+  return gender === "boy"
+    ? "小学生主角设定：一位 8-10 岁广西小学生男孩，明亮眼睛、友好表情，穿红蓝相间、带少量壮锦纹样的小外套，背一个小书包。"
+    : "小学生主角设定：一位 8-10 岁广西小学生女孩，默认以肖予曦女生角色为原型，明亮眼睛、友好表情，穿红蓝相间、带少量壮锦纹样的小外套，背一个小书包。";
+}
+
+function makeIllustrationPrompt(
+  pageTitle: string,
+  pageText: string,
+  heritage: string[],
+  tourism: string[],
+  language: BookLanguage,
+  protagonistGender: ProtagonistGender
+) {
   if (language === "en") {
     return [
       "Warm and bright children's picture book illustration, watercolor texture, one elementary-school protagonist, suitable for ages 6-12.",
+      protagonistVisualSpec(language, protagonistGender),
+      guiXiaolingVisualSpec(language),
       `Page theme: ${pageTitle}.`,
       `Story scene: ${pageText}`,
       `Guangxi intangible heritage elements: ${heritage.join(", ")}.`,
@@ -49,6 +85,8 @@ function makeIllustrationPrompt(pageTitle: string, pageText: string, heritage: s
 
   return [
     "儿童绘本插图，温暖明亮的水彩风格，小学生主角，画面适合 6-12 岁儿童。",
+    protagonistVisualSpec(language, protagonistGender),
+    guiXiaolingVisualSpec(language),
     `页面主题：${pageTitle}。`,
     `故事画面：${pageText}`,
     `广西非遗元素：${heritage.join("、")}。`,
@@ -57,7 +95,7 @@ function makeIllustrationPrompt(pageTitle: string, pageText: string, heritage: s
   ].join("\n");
 }
 
-export function createFallbackBook(idea: string, language: BookLanguage = "zh"): PictureBook {
+export function createFallbackBook(idea: string, language: BookLanguage = "zh", protagonistGender: ProtagonistGender = "girl"): PictureBook {
   const id = makeBookId();
   const timestamp = nowIso();
   const heritage = pickElements(idea, heritageElements, 3);
@@ -79,7 +117,7 @@ export function createFallbackBook(idea: string, language: BookLanguage = "zh"):
       pageNumber: index + 1,
       title: titles[index],
       text,
-      imagePrompt: makeIllustrationPrompt(titles[index], text, heritage, tourism, language),
+      imagePrompt: makeIllustrationPrompt(titles[index], text, heritage, tourism, language, protagonistGender),
       imageUrl: "",
       imageSource: "placeholder",
       cultureNote: `${heritage[index % heritage.length]} is a Guangxi cultural element. It can become a story character, clue, or visual symbol.`
@@ -92,6 +130,7 @@ export function createFallbackBook(idea: string, language: BookLanguage = "zh"):
       subtitle: "An AI picture book where travel and heritage shine together",
       originalIdea: idea,
       language,
+      protagonistGender,
       createdAt: timestamp,
       updatedAt: timestamp,
       heritageElements: heritage,
@@ -129,7 +168,7 @@ export function createFallbackBook(idea: string, language: BookLanguage = "zh"):
     pageNumber: index + 1,
     title: ["灵感发光", "走进广西", "小小讲解员", "我的创编绘本"][index],
     text,
-    imagePrompt: makeIllustrationPrompt(["灵感发光", "走进广西", "小小讲解员", "我的创编绘本"][index], text, heritage, tourism, language),
+    imagePrompt: makeIllustrationPrompt(["灵感发光", "走进广西", "小小讲解员", "我的创编绘本"][index], text, heritage, tourism, language, protagonistGender),
     imageUrl: "",
     imageSource: "placeholder",
     cultureNote: `${heritage[index % heritage.length]}是广西文化元素，可以被创编成故事角色、线索或画面符号。`
@@ -143,6 +182,7 @@ export function createFallbackBook(idea: string, language: BookLanguage = "zh"):
     subtitle: "一本文旅和非遗一起发光的 AI 绘本",
     originalIdea: idea,
     language,
+    protagonistGender,
     createdAt: timestamp,
     updatedAt: timestamp,
     heritageElements: heritage,

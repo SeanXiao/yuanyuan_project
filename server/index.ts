@@ -112,13 +112,14 @@ app.post("/api/picture-books/generate", async (request, response, next) => {
   try {
     const idea = String(request.body?.idea || "").trim();
     const language = request.body?.language === "en" ? "en" : "zh";
+    const protagonistGender = request.body?.protagonistGender === "boy" ? "boy" : "girl";
     const shouldGenerateImage = request.body?.generateImage !== false;
     if (!idea) {
       response.status(400).json({ error: "idea is required" });
       return;
     }
 
-    let book = await createPictureBookDraft(idea, language);
+    let book = await createPictureBookDraft(idea, language, protagonistGender);
     if (shouldGenerateImage) {
       const result = await generateAllPageImages(book);
       book = {

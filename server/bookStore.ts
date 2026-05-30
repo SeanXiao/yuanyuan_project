@@ -14,6 +14,8 @@ export type PromptRecord = {
 
 export type BookLanguage = "zh" | "en";
 
+export type ProtagonistGender = "girl" | "boy";
+
 export type PictureBookPage = {
   pageNumber: number;
   title: string;
@@ -30,6 +32,7 @@ export type PictureBook = {
   subtitle: string;
   originalIdea: string;
   language?: BookLanguage;
+  protagonistGender?: ProtagonistGender;
   createdAt: string;
   updatedAt: string;
   heritageElements: string[];
@@ -49,6 +52,7 @@ export type PictureBookSummary = {
   subtitle: string;
   updatedAt: string;
   language?: BookLanguage;
+  protagonistGender?: ProtagonistGender;
   heritageElements: string[];
   tourismElements: string[];
   coverImageUrl: string;
@@ -91,6 +95,7 @@ function summarize(book: PictureBook): PictureBookSummary {
     subtitle: book.subtitle,
     updatedAt: book.updatedAt,
     language: book.language || "zh",
+    protagonistGender: book.protagonistGender || "girl",
     heritageElements: book.heritageElements,
     tourismElements: book.tourismElements,
     coverImageUrl: book.pages[0]?.imageUrl || ""

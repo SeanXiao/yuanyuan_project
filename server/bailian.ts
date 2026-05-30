@@ -7,7 +7,8 @@ import {
   type BookLanguage,
   type PictureBook,
   type PictureBookPage,
-  type PromptRecord
+  type PromptRecord,
+  type ProtagonistGender
 } from "./bookStore.js";
 import { createFallbackBook } from "./guangxiFallback.js";
 
@@ -89,6 +90,51 @@ function useGuiXiaolingName(text = "", language: BookLanguage = "zh") {
     .replace(/小圆/gu, "桂小灵");
 }
 
+function guiXiaolingVisualSpec(language: BookLanguage = "zh") {
+  if (language === "en") {
+    return [
+      "Gui Xiaoling visual lock: a cute glossy white-and-blue round robot mascot with a glowing cyan face and heart, headset microphone, friendly childlike smile, and soft toy-like proportions.",
+      "Guangxi design details: indigo Zhuang-style headscarf with teal, white, red, and gold brocade trim, small silver-inspired charm by the knot, blue cape, Zhuang brocade patterns on cuffs/cape/notebook, and bronze-drum medallions on the chest and notebook.",
+      "In picture-book images, Gui Xiaoling must be the consistent companion robot character, not a generic AI assistant, human child, animal, or unrelated robot."
+    ].join(" ");
+  }
+
+  return [
+    "桂小灵视觉锁定：可爱的白蓝配色圆润机器人吉祥物，黑色发光屏幕脸、青蓝色笑脸和爱心灯、耳麦、亲切儿童化表情，整体像柔和精致的 3D 玩具机器人。",
+    "广西特色细节：靛蓝壮族风格头巾，带青蓝、白、红、金色壮锦几何边纹，头巾结旁有轻巧银饰小挂件；蓝色披风、袖口/披风/本子有壮锦纹样，胸口和本子有铜鼓纹饰徽章。",
+    "绘本插图中，桂小灵必须作为固定的画册机器人伙伴出现，不要画成普通 AI 助手、人类小孩、动物或其他无关机器人。"
+  ].join(" ");
+}
+
+function protagonistVisualSpec(language: BookLanguage = "zh", gender: ProtagonistGender = "girl") {
+  if (language === "en") {
+    return gender === "boy"
+      ? "Student protagonist visual lock: one 8-10 year-old Guangxi elementary-school boy, bright eyes, friendly expression, simple red-blue jacket with subtle Zhuang brocade details, small backpack."
+      : "Student protagonist visual lock: one 8-10 year-old Guangxi elementary-school girl, inspired by Xiaoyuxi as the default girl role, bright eyes, friendly expression, simple red-blue jacket with subtle Zhuang brocade details, small backpack.";
+  }
+
+  return gender === "boy"
+    ? "小学生主角视觉锁定：一位 8-10 岁广西小学生男孩，明亮眼睛、友好表情，穿红蓝相间、带少量壮锦纹样的小外套，背一个小书包。"
+    : "小学生主角视觉锁定：一位 8-10 岁广西小学生女孩，默认以肖予曦女生角色为原型，明亮眼睛、友好表情，穿红蓝相间、带少量壮锦纹样的小外套，背一个小书包。";
+}
+
+function withCharacterImagePrompt(prompt = "", language: BookLanguage = "zh", protagonistGender: ProtagonistGender = "girl") {
+  const namedPrompt = useGuiXiaolingName(prompt, language);
+  const protagonistMarker = language === "en" ? "Student protagonist visual lock" : "小学生主角视觉锁定";
+  const robotMarker = language === "en" ? "Gui Xiaoling visual lock" : "桂小灵视觉锁定";
+  const promptParts = [namedPrompt];
+
+  if (!namedPrompt.includes(protagonistMarker)) {
+    promptParts.push(protagonistVisualSpec(language, protagonistGender));
+  }
+
+  if (!namedPrompt.includes(robotMarker)) {
+    promptParts.push(guiXiaolingVisualSpec(language));
+  }
+
+  return promptParts.filter(Boolean).join("\n");
+}
+
 async function chatCompletion(messages: ChatMessage[]) {
   if (!dashScopeKey()) {
     throw new Error("DASHSCOPE_API_KEY is missing");
@@ -124,8 +170,8 @@ async function chatCompletion(messages: ChatMessage[]) {
   return content;
 }
 
-function normalizeDraft(idea: string, draft: BookDraft, language: BookLanguage): BookDraft {
-  const fallback = createFallbackBook(idea, language);
+function normalizeDraft(idea: string, draft: BookDraft, language: BookLanguage, protagonistGender: ProtagonistGender): BookDraft {
+  const fallback = createFallbackBook(idea, language, protagonistGender);
   const pages = Array.isArray(draft.pages) && draft.pages.length ? draft.pages.slice(0, 4) : fallback.pages;
 
   return {
@@ -133,6 +179,7 @@ function normalizeDraft(idea: string, draft: BookDraft, language: BookLanguage):
     subtitle: useGuiXiaolingName(draft.subtitle || fallback.subtitle, language),
     originalIdea: idea,
     language,
+    protagonistGender,
     heritageElements: (draft.heritageElements || fallback.heritageElements).slice(0, 5).map((item) => useGuiXiaolingName(item, language)),
     tourismElements: (draft.tourismElements || fallback.tourismElements).slice(0, 5).map((item) => useGuiXiaolingName(item, language)),
     guidingQuestions: (draft.guidingQuestions || fallback.guidingQuestions).slice(0, 3).map((item) => useGuiXiaolingName(item, language)),
@@ -141,7 +188,7 @@ function normalizeDraft(idea: string, draft: BookDraft, language: BookLanguage):
       pageNumber: index + 1,
       title: useGuiXiaolingName(page.title || fallback.pages[index]?.title || `第 ${index + 1} 页`, language),
       text: useGuiXiaolingName(page.text || fallback.pages[index]?.text || "", language),
-      imagePrompt: useGuiXiaolingName(page.imagePrompt || fallback.pages[index]?.imagePrompt || "", language),
+      imagePrompt: withCharacterImagePrompt(page.imagePrompt || fallback.pages[index]?.imagePrompt || "", language, protagonistGender),
       imageUrl: page.imageUrl || "",
       imageSource: page.imageSource || "placeholder",
       cultureNote: useGuiXiaolingName(page.cultureNote || fallback.pages[index]?.cultureNote || "", language)
@@ -152,8 +199,8 @@ function normalizeDraft(idea: string, draft: BookDraft, language: BookLanguage):
   };
 }
 
-export async function createPictureBookDraft(idea: string, language: BookLanguage = "zh") {
-  const fallback = createFallbackBook(idea, language);
+export async function createPictureBookDraft(idea: string, language: BookLanguage = "zh", protagonistGender: ProtagonistGender = "girl") {
+  const fallback = createFallbackBook(idea, language, protagonistGender);
   if (!hasBailianKey()) {
     return fallback;
   }
@@ -164,6 +211,7 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
           "You are the AI creative coach for Guiyun Creator, serving elementary-school students.",
           "Task: Turn a student's one-sentence idea into a Guangxi intangible-heritage and cultural-tourism AI picture book.",
           "Perspective: Write from the student's point of view, emphasizing 'I create together with AI'. Do not sound like an adult managing a child.",
+          `Student protagonist: use ${protagonistGender === "boy" ? "a boy" : "a girl"} as the story's elementary-school protagonist. ${protagonistVisualSpec("en", protagonistGender)}`,
           "Companion character: whenever the AI helper or robot helper appears in the story, its name must be Gui Xiaoling. Do not write generic names such as AI assistant, AI helper, assistant, or Xiaoyuan.",
           "Content: Combine Guangxi intangible cultural heritage, cultural tourism, ethnic culture, and creative-writing growth.",
           "Safety: Suitable for ages 6-12. Avoid danger, horror, adult content, ads, or invented policy claims.",
@@ -174,6 +222,7 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
           "你是“桂韵创想家”的 AI 创编导师，服务对象是小学组学生。",
           "任务：根据学生的一句话灵感，生成广西非遗文旅 AI 绘本。",
           "视角：必须使用学生视角，强调“我和 AI 一起创作”，不要写成成人管理孩子。",
+          `小学生主角：故事主角必须是${protagonistGender === "boy" ? "男孩" : "女孩"}。${protagonistVisualSpec("zh", protagonistGender)}`,
           "伙伴角色：如果故事里出现帮助我的 AI 或机器人助手，名字必须是“桂小灵”，不要写“AI小助手”“AI助手”“小助手”“小圆”。",
           "内容：融合广西非遗、文旅、民族文化和创编能力训练。",
           "安全：适合 6-12 岁儿童，不出现危险、恐怖、成人化、商业广告或编造政策内容。",
@@ -190,6 +239,8 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
           "subtitle: one short subtitle in English",
           "originalIdea: original idea",
           "language: exactly \"en\"",
+          `protagonistGender: exactly "${protagonistGender}"`,
+          `The elementary-school protagonist must be ${protagonistGender === "boy" ? "a boy" : "a girl"} throughout story text and image prompts.`,
           "If a helper robot appears in the story, call it Gui Xiaoling every time.",
           "heritageElements: 2-5 Guangxi intangible heritage / ethnic culture elements",
           "tourismElements: 2-5 Guangxi cultural tourism elements",
@@ -201,6 +252,8 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
           "studentReflection: student reflection within 45 English words",
           "aiContentRatio: number from 80 to 95",
           "Image prompts should be in English or bilingual, suitable for children's picture books, watercolor or new-Chinese illustration style, with clear Guangxi cultural elements. No text, watermark, or real-person portrait.",
+          `Image prompts must keep this student protagonist visual: ${protagonistVisualSpec("en", protagonistGender)}`,
+          `Image prompts must use this exact companion role when Gui Xiaoling appears: ${guiXiaolingVisualSpec("en")}`,
           "The 4 image prompts must keep the same elementary-school protagonist, same outfit, same visual style, and continuous story mood. Only the scene and action change per page."
         ].join("\n")
       : [
@@ -210,6 +263,8 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
           "subtitle: 一句副标题",
           "originalIdea: 原始灵感",
           "language: 固定为 \"zh\"",
+          `protagonistGender: 固定为 "${protagonistGender}"`,
+          `故事正文和图片 Prompt 中的小学生主角必须始终是${protagonistGender === "boy" ? "男孩" : "女孩"}。`,
           "如果故事里出现帮助我的机器人或 AI 伙伴，请每次都称呼它为“桂小灵”。",
           "heritageElements: 2-5 个广西非遗/民族文化元素",
           "tourismElements: 2-5 个广西文旅元素",
@@ -220,6 +275,8 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
           "studentReflection: 60 字以内学生创作反思",
           "aiContentRatio: 80 到 95 的数字",
           "图片 Prompt 要适合儿童绘本、水彩或国潮插画风格，明确广西文化元素，不要文字、水印、真实人物肖像。",
+          `图片 Prompt 必须保持这个小学生主角设定：${protagonistVisualSpec("zh", protagonistGender)}`,
+          `图片 Prompt 必须使用这个画册机器人角色设定：${guiXiaolingVisualSpec("zh")}`,
           "4 页图片 Prompt 必须保持同一位小学生主角、同一套服装、同一绘本画风和连续故事氛围，只改变每页场景与动作。"
         ].join("\n");
 
@@ -228,7 +285,7 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt }
     ]);
-    const normalized = normalizeDraft(idea, extractJson(content), language);
+    const normalized = normalizeDraft(idea, extractJson(content), language, protagonistGender);
     const timestamp = nowIso();
     return {
       ...normalized,
@@ -367,24 +424,39 @@ async function callBailianImage(prompt: string, bookId: string, pageNumber: numb
   return downloadGeneratedImage(imageUrl, bookId, pageNumber);
 }
 
+function cleanPageImagePrompt(prompt = "") {
+  const marker = "当前页原始图片 Prompt：";
+  const markerIndex = prompt.lastIndexOf(marker);
+  if (markerIndex >= 0) {
+    return prompt.slice(markerIndex + marker.length).trim();
+  }
+
+  return prompt.trim();
+}
+
 function buildCoherentImagePrompt(book: PictureBook, page: PictureBookPage) {
-  const storyboard = book.pages.map((item) => `第${item.pageNumber}页《${item.title}》：${item.text}`).join("\n");
+  const protagonistGender = book.protagonistGender || "girl";
+  const context = book.pages
+    .map((item) => `第${item.pageNumber}页《${item.title}》`)
+    .join("、");
   return [
     "请生成一张高质量儿童绘本插图，必须与同一本绘本的其他页保持连贯。",
-    "统一视觉设定：同一位 8-10 岁广西小学生主角贯穿四页，圆脸、明亮眼睛、友好表情，穿红蓝相间、带少量壮锦纹样的小外套，背一个小书包。",
+    "画面格式硬性要求：只生成当前页的一张完整单幅插图。不要四宫格、不要漫画分镜、不要拼贴、多窗格、多张小图或缩略图合集。",
+    "内容范围硬性要求：画面只表现当前页故事的一个关键瞬间，不要把第1页、第2页、第3页、第4页同时画在同一张图里。",
+    "角色数量硬性要求：画面中只出现一位小学生主角和一个桂小灵机器人，不要重复主角，不要重复桂小灵，不要出现第二个相同小朋友。",
+    `统一视觉设定：同一位小学生主角贯穿四页。${protagonistVisualSpec(book.language || "zh", protagonistGender)}`,
+    `统一伙伴角色设定：每页都让桂小灵作为画册机器人小伙伴自然出现在画面中。${guiXiaolingVisualSpec(book.language || "zh")}`,
     "统一画风：温暖明亮的儿童绘本插画，细腻水彩质感，柔和光线，广西民族纹样点缀，画面适合小学组展示。",
-    "统一限制：不要出现文字、字幕、水印、Logo、真实人物肖像；不要改变主角长相、年龄、服装和整体画风。",
-    `绘本标题：${book.title}`,
+    "文字限制硬性要求：画面里绝对不要出现任何文字、汉字、英文字母、标题、横幅、标牌、页码、字幕、水印或 Logo；不要把下面的标题信息画进图片。",
+    "统一限制：不要出现真实人物肖像；不要改变主角长相、年龄、服装和整体画风。",
     `全书非遗元素：${book.heritageElements.join("、")}`,
     `全文旅元素：${book.tourismElements.join("、")}`,
-    "四页连续故事板：",
-    storyboard,
-    "当前需要绘制的页面：",
-    `第${page.pageNumber}页《${page.title}》`,
+    `全书页目仅供角色一致性参考，不要画成分镜：${context}`,
+    `当前只绘制第 ${page.pageNumber} 页对应的单个故事画面，页标题仅供理解，不得出现在画面中。`,
     `当前页正文：${page.text}`,
     `当前页文化提示：${page.cultureNote}`,
     "当前页原始图片 Prompt：",
-    page.imagePrompt
+    cleanPageImagePrompt(page.imagePrompt)
   ].join("\n");
 }
 
