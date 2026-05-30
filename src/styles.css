@@ -763,6 +763,70 @@ h3 {
   background: #fff1ea;
 }
 
+.progress-stream {
+  display: grid;
+  gap: 8px;
+  padding: 11px;
+  border: 1px solid rgba(151, 130, 92, 0.16);
+  border-radius: 18px;
+  background: rgba(255, 253, 247, 0.76);
+}
+
+.progress-stream-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #273b36;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.progress-stream-head span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.progress-stream-head em {
+  color: #7a8a84;
+  font-size: 0.76rem;
+  font-style: normal;
+}
+
+.progress-stream-body {
+  display: grid;
+  gap: 6px;
+  max-height: 180px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.progress-stream-body p {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  margin: 0;
+  padding: 8px 9px;
+  border-radius: 13px;
+  color: #3b514b;
+  background: rgba(234, 247, 239, 0.66);
+  font-size: 0.82rem;
+  font-weight: 850;
+  line-height: 1.5;
+}
+
+.progress-stream-body p.latest {
+  background: #fff1cf;
+}
+
+.progress-stream-body p span {
+  color: #8a7661;
+  font-variant-numeric: tabular-nums;
+  font-weight: 900;
+}
+
 .post-generate-actions {
   display: flex;
   align-items: center;

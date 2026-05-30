@@ -93,6 +93,7 @@ type GenerationProgress = {
   title: string;
   detail: string;
   imageTasks: Record<number, ImageTaskStatus>;
+  activityLog: string[];
   error?: string;
 };
 
@@ -575,7 +576,103 @@ function mergePictureBook(current: PictureBook | null, incoming: PictureBook) {
   };
 }
 
-function makeProgress(stage: ProgressStage, title: string, detail: string, imageTasks = emptyImageTasks): GenerationProgress {
+function trimLogText(text = "", maxLength = 84) {
+  const compact = displayBookText(text).replace(/\s+/gu, " ").trim();
+  return compact.length > maxLength ? `${compact.slice(0, maxLength - 1)}…` : compact;
+}
+
+function appendActivityLog(progress: GenerationProgress, lines: string[]) {
+  const nextLines = [...progress.activityLog];
+  lines.map((line) => line.trim()).filter(Boolean).forEach((line) => {
+    if (!nextLines.includes(line)) {
+      nextLines.push(line);
+    }
+  });
+
+  return {
+    ...progress,
+    activityLog: nextLines.slice(-18)
+  };
+}
+
+function makeGenerationLog(idea: string, language: BookLanguage) {
+  if (language === "en") {
+    return [
+      `Received idea: ${trimLogText(idea, 72)}`,
+      "Identifying the main place, protagonist, and Guangxi cultural clues."
+    ];
+  }
+
+  return [
+    `收到灵感：${trimLogText(idea, 72)}`,
+    "正在识别地点、主角、广西文化线索和故事动作。"
+  ];
+}
+
+function makeBookActivityLog(book: PictureBook) {
+  const language = book.language || "zh";
+  if (language === "en") {
+    return [
+      `Title drafted: ${trimLogText(book.title, 72)}`,
+      `Story route: ${trimLogText(book.outline, 94)}`,
+      ...book.pages.flatMap((page) => [
+        `Page ${page.pageNumber}: ${trimLogText(page.title, 58)}`,
+        `Mini encyclopedia: ${trimLogText(page.cultureNote, 92)}`
+      ])
+    ];
+  }
+
+  return [
+    `标题成形：${trimLogText(book.title, 72)}`,
+    `故事路线：${trimLogText(book.outline, 94)}`,
+    ...book.pages.flatMap((page) => [
+      `第 ${page.pageNumber} 页：${trimLogText(page.title, 58)}`,
+      `小百科：${trimLogText(page.cultureNote, 92)}`
+    ])
+  ];
+}
+
+const stageActivityLines: Record<ProgressStage, string[]> = {
+  understanding: [
+    "正在把灵感拆成地点、角色、动作和文化线索。",
+    "正在判断哪些广西元素真正适合这个故事。",
+    "正在避免把无关的热门符号硬塞进故事。"
+  ],
+  story: [
+    "正在组织 4 页起承转合，让故事适合朗读。",
+    "正在为每一页选择一个可以画出来的关键瞬间。",
+    "正在把文化说明改写成儿童能听懂的小百科。"
+  ],
+  prompts: [
+    "正在把故事页整理成插图提示。",
+    "正在锁定主角外观、桂小灵造型和统一画风。",
+    "正在清理插图提示里的文字内容，避免文字被画进图片。"
+  ],
+  images: [
+    "插图任务已经开始，正在等待每一页返回。",
+    "正在把完成的插图放回对应故事页。",
+    "正在检查插图任务状态，失败的页面可以稍后重画。"
+  ],
+  archive: [
+    "正在保存绘本、创作记录和小百科。",
+    "正在刷新我的绘本书架。",
+    "绘本完成后可以打开剧场朗读。"
+  ]
+};
+
+function appendNextStageActivity(progress: GenerationProgress) {
+  const candidates = stageActivityLines[progress.stage] || [];
+  const nextLine = candidates.find((line) => !progress.activityLog.includes(line));
+  return nextLine ? appendActivityLog(progress, [nextLine]) : progress;
+}
+
+function makeProgress(
+  stage: ProgressStage,
+  title: string,
+  detail: string,
+  imageTasks = emptyImageTasks,
+  activityLog: string[] = []
+): GenerationProgress {
   return {
     active: true,
     startedAt: Date.now(),
@@ -583,7 +680,8 @@ function makeProgress(stage: ProgressStage, title: string, detail: string, image
     stage,
     title,
     detail,
-    imageTasks: { ...imageTasks }
+    imageTasks: { ...imageTasks },
+    activityLog
   };
 }
 
@@ -654,6 +752,23 @@ export default function App() {
   }, [generationProgress?.active]);
 
   useEffect(() => {
+    if (!generationProgress?.active) {
+      return undefined;
+    }
+
+    const timer = window.setInterval(() => {
+      setGenerationProgress((current) => {
+        if (!current?.active) {
+          return current;
+        }
+        return appendNextStageActivity(current);
+      });
+    }, 2600);
+
+    return () => window.clearInterval(timer);
+  }, [generationProgress?.active, generationProgress?.stage]);
+
+  useEffect(() => {
     workbenchBodyRef.current?.scrollTo({ top: 0, behavior: "smooth" });
     if (activeBook) {
       workbenchRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
@@ -717,18 +832,27 @@ export default function App() {
     setActiveTab("book");
     setActiveBook(null);
     setGenerationProgress(
-      makeProgress("understanding", "正在把灵感写进故事本", "桂小灵正在找主角、广西文化亮点和旅行地点。")
+      makeProgress(
+        "understanding",
+        "正在把灵感写进故事本",
+        "桂小灵正在找主角、广西文化亮点和旅行地点。",
+        emptyImageTasks,
+        makeGenerationLog(cleanIdea, bookLanguage)
+      )
     );
     setNotice("桂小灵正在读你的灵感，马上开始整理故事");
     try {
       setGenerationProgress((current) =>
         current
-          ? {
-              ...current,
-              stage: "story",
-              title: "正在整理故事",
-              detail: "桂小灵正在整理标题、4 页故事、文化小百科和小学生讲解词。"
-            }
+          ? appendActivityLog(
+              {
+                ...current,
+                stage: "story",
+                title: "正在整理故事",
+                detail: "桂小灵正在整理标题、4 页故事、文化小百科和小学生讲解词。"
+              },
+              ["开始整理标题、4 页故事、文化小百科和小学生讲解词。"]
+            )
           : current
       );
       const response = await fetch("/api/picture-books/generate", {
@@ -742,18 +866,22 @@ export default function App() {
       }
       setActiveBook(data.book);
       setBooks(data.books || []);
+      const draftLog = makeBookActivityLog(data.book);
       const speechPreload =
         bookLanguage === "zh" ? preloadSpeechForBook(data.book.id) : Promise.resolve<PictureBook | null>(null);
       setGenerationProgress((current) =>
         current
-          ? {
-              ...current,
-              stage: shouldGenerateImage ? "prompts" : "archive",
-              title: shouldGenerateImage ? "正在为绘本分镜" : "正在放进我的书架",
-              detail: shouldGenerateImage
-                ? "故事路线已经出现，正在整理 4 页画面和角色样子。"
-                : "故事、创作记录和绘本档案正在放进书架。"
-            }
+          ? appendActivityLog(
+              {
+                ...current,
+                stage: shouldGenerateImage ? "prompts" : "archive",
+                title: shouldGenerateImage ? "正在为绘本分镜" : "正在放进我的书架",
+                detail: shouldGenerateImage
+                  ? "故事路线已经出现，正在整理 4 页画面和角色样子。"
+                  : "故事、创作记录和绘本档案正在放进书架。"
+              },
+              draftLog.concat(shouldGenerateImage ? ["故事草稿完成，准备整理插图提示。"] : ["故事草稿完成，准备放进书架。"])
+            )
           : current
       );
 
@@ -764,13 +892,16 @@ export default function App() {
         );
         setGenerationProgress((current) =>
           current
-            ? {
-                ...current,
-                stage: "images",
-                title: "正在为故事页绘制插图",
-                detail: "桂小灵会把 4 个故事页一页页画好，完成后自动放回绘本。",
-                imageTasks: runningTasks
-              }
+            ? appendActivityLog(
+                {
+                  ...current,
+                  stage: "images",
+                  title: "正在为故事页绘制插图",
+                  detail: "桂小灵会把 4 个故事页一页页画好，完成后自动放回绘本。",
+                  imageTasks: runningTasks
+                },
+                ["4 页插图任务已排队，正在同时绘制。"]
+              )
             : current
         );
         setNotice("故事已经整理好，桂小灵正在绘制插图");
@@ -783,16 +914,19 @@ export default function App() {
 
         setGenerationProgress((current) =>
           current
-            ? {
-                ...current,
-                active: false,
-                stage: "archive",
-                title: failedCount ? "故事书已装订完成，部分插图可再画" : "故事书已装订完成",
-                detail: failedCount
-                  ? `有 ${failedCount} 页插图还没画好，故事已先放进绘本。`
-                  : "4 页故事、插图和文化小百科都已经放进绘本里了。",
-                error: failedCount ? "部分插图还没画好" : undefined
-              }
+            ? appendActivityLog(
+                {
+                  ...current,
+                  active: false,
+                  stage: "archive",
+                  title: failedCount ? "故事书已装订完成，部分插图可再画" : "故事书已装订完成",
+                  detail: failedCount
+                    ? `有 ${failedCount} 页插图还没画好，故事已先放进绘本。`
+                    : "4 页故事、插图和文化小百科都已经放进绘本里了。",
+                  error: failedCount ? "部分插图还没画好" : undefined
+                },
+                [failedCount ? `绘本已保存，有 ${failedCount} 页插图可以稍后重画。` : "绘本已保存到书架，可以打开剧场朗读。"]
+              )
             : current
         );
         await refreshBooks();
@@ -801,13 +935,16 @@ export default function App() {
         void speechPreload;
         setGenerationProgress((current) =>
           current
-            ? {
-                ...current,
-                active: false,
-                stage: "archive",
-                title: "故事书已装订完成",
-                detail: "已保存故事、文化小百科和创作记录；需要插图时可以单页补画。"
-              }
+            ? appendActivityLog(
+                {
+                  ...current,
+                  active: false,
+                  stage: "archive",
+                  title: "故事书已装订完成",
+                  detail: "已保存故事、文化小百科和创作记录；需要插图时可以单页补画。"
+                },
+                ["绘本已保存到书架，可以继续补画插图。"]
+              )
             : current
         );
         setNotice("故事书已装订完成：可以单页补画插图或查看创作记录");
@@ -816,13 +953,16 @@ export default function App() {
       const message = error instanceof Error ? error.message : "绘本制作失败";
       setGenerationProgress((current) =>
         current
-          ? {
-              ...current,
-              active: false,
-              title: "创作路上遇到一点问题",
-              detail: message,
-              error: message
-            }
+          ? appendActivityLog(
+              {
+                ...current,
+                active: false,
+                title: "创作路上遇到一点问题",
+                detail: message,
+                error: message
+              },
+              [`遇到问题：${message}`]
+            )
           : current
       );
       setNotice(message);
@@ -834,13 +974,16 @@ export default function App() {
   async function generateImageForBook(bookId: string, pageNumber: number, mode: "batch" | "single") {
     setGenerationProgress((current) =>
       current
-        ? {
-            ...current,
-            stage: "images",
-            title: mode === "batch" ? "正在为故事页绘制插图" : `桂小灵正在画第 ${pageNumber} 页`,
-            detail: `第 ${pageNumber} 页插图马上就好啦。`,
-            imageTasks: { ...current.imageTasks, [pageNumber]: "running" }
-          }
+        ? appendActivityLog(
+            {
+              ...current,
+              stage: "images",
+              title: mode === "batch" ? "正在为故事页绘制插图" : `桂小灵正在画第 ${pageNumber} 页`,
+              detail: `第 ${pageNumber} 页插图马上就好啦。`,
+              imageTasks: { ...current.imageTasks, [pageNumber]: "running" }
+            },
+            [`第 ${pageNumber} 页：开始绘制插图。`]
+          )
         : current
     );
 
@@ -849,10 +992,13 @@ export default function App() {
     if (!response.ok || !data.book) {
       setGenerationProgress((current) =>
         current
-          ? {
-              ...current,
-              imageTasks: { ...current.imageTasks, [pageNumber]: "error" }
-            }
+          ? appendActivityLog(
+              {
+                ...current,
+                imageTasks: { ...current.imageTasks, [pageNumber]: "error" }
+              },
+              [`第 ${pageNumber} 页：插图暂时失败，可以稍后重画。`]
+            )
           : current
       );
       throw new Error(data.error || "插图暂时没画好");
@@ -861,11 +1007,14 @@ export default function App() {
     setActiveBook((current) => mergePictureBook(current, data.book!));
     setGenerationProgress((current) =>
       current
-        ? {
-            ...current,
-            detail: `第 ${pageNumber} 页插图已经放进绘本，桂小灵继续整理其他页面。`,
-            imageTasks: { ...current.imageTasks, [pageNumber]: "done" }
-          }
+        ? appendActivityLog(
+            {
+              ...current,
+              detail: `第 ${pageNumber} 页插图已经放进绘本，桂小灵继续整理其他页面。`,
+              imageTasks: { ...current.imageTasks, [pageNumber]: "done" }
+            },
+            [`第 ${pageNumber} 页：插图已保存到绘本。`]
+          )
         : current
     );
     return data.book;
@@ -881,7 +1030,7 @@ export default function App() {
       makeProgress("images", `桂小灵正在画第 ${pageNumber} 页`, `第 ${pageNumber} 页插图马上就好啦。`, {
         ...emptyImageTasks,
         [pageNumber]: "running"
-      })
+      }, [`准备重画第 ${pageNumber} 页插图。`])
     );
     setNotice(`桂小灵正在为第 ${pageNumber} 页绘制插图`);
     try {
@@ -889,13 +1038,16 @@ export default function App() {
       await refreshBooks();
       setGenerationProgress((current) =>
         current
-          ? {
-              ...current,
-              active: false,
-              stage: "archive",
-              title: `第 ${pageNumber} 页插图已更新`,
-              detail: "插图已保存到我的绘本书架，可以继续换其他页面。"
-            }
+          ? appendActivityLog(
+              {
+                ...current,
+                active: false,
+                stage: "archive",
+                title: `第 ${pageNumber} 页插图已更新`,
+                detail: "插图已保存到我的绘本书架，可以继续换其他页面。"
+              },
+              [`第 ${pageNumber} 页插图更新完成。`]
+            )
           : current
       );
       setNotice("插图已更新");
@@ -903,13 +1055,16 @@ export default function App() {
       const message = error instanceof Error ? error.message : "插图暂时没画好";
       setGenerationProgress((current) =>
         current
-          ? {
-              ...current,
-              active: false,
-              title: "这一页暂时没画好",
-              detail: message,
-              error: message
-            }
+          ? appendActivityLog(
+              {
+                ...current,
+                active: false,
+                title: "这一页暂时没画好",
+                detail: message,
+                error: message
+              },
+              [`第 ${pageNumber} 页插图遇到问题：${message}`]
+            )
           : current
       );
       setNotice(message);
@@ -1430,6 +1585,15 @@ function getPlayerCopy(language: BookLanguage) {
 function GenerationProgressPanel({ progress }: { progress: GenerationProgress }) {
   const percent = getProgressPercent(progress);
   const hasImageTasks = Object.values(progress.imageTasks).some((status) => status !== "idle");
+  const streamRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const stream = streamRef.current;
+    if (!stream) {
+      return;
+    }
+    stream.scrollTo({ top: stream.scrollHeight, behavior: "smooth" });
+  }, [progress.activityLog.length]);
 
   return (
     <section className={`progress-panel ${progress.error ? "has-error" : ""}`} aria-live="polite">
@@ -1472,6 +1636,26 @@ function GenerationProgressPanel({ progress }: { progress: GenerationProgress })
               </div>
             );
           })}
+        </div>
+      ) : null}
+
+      {progress.activityLog.length ? (
+        <div className="progress-stream">
+          <div className="progress-stream-head">
+            <span>
+              <Sparkles size={15} />
+              创作过程
+            </span>
+            <em>公开草稿流</em>
+          </div>
+          <div className="progress-stream-body" ref={streamRef}>
+            {progress.activityLog.map((line, index) => (
+              <p className={index === progress.activityLog.length - 1 ? "latest" : ""} key={`${line}-${index}`}>
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                {softenDisplayText(line)}
+              </p>
+            ))}
+          </div>
         </div>
       ) : null}
     </section>
