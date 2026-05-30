@@ -53,7 +53,7 @@ function storyTextMaxTokens() {
 }
 
 function storyTextTimeoutMs() {
-  return numberFromEnv("BAILIAN_STORY_TEXT_TIMEOUT_MS", 45000);
+  return numberFromEnv("BAILIAN_STORY_TEXT_TIMEOUT_MS", 90000);
 }
 
 function inspirationTextModel() {
