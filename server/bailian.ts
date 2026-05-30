@@ -19,6 +19,11 @@ type ChatMessage = {
 
 type BookDraft = Omit<PictureBook, "id" | "createdAt" | "updatedAt" | "promptRecords">;
 
+type InspirationChipResponse = {
+  contextLabel?: string;
+  chips?: string[];
+};
+
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const generatedDir = join(rootDir, "data", "generated");
 
@@ -32,6 +37,10 @@ function textBaseUrl() {
 
 function textModel() {
   return process.env.BAILIAN_TEXT_MODEL || "qwen3.7-max";
+}
+
+function inspirationTextModel() {
+  return process.env.BAILIAN_INSPIRATION_TEXT_MODEL || process.env.BAILIAN_FAST_TEXT_MODEL || "qwen-turbo";
 }
 
 function imageModel() {
@@ -50,12 +59,89 @@ export function getBailianRuntimeStatus() {
   return {
     configured: hasBailianKey(),
     textModel: textModel(),
+    inspirationTextModel: inspirationTextModel(),
     imageModel: imageModel(),
     imageSize: imageSize()
   };
 }
 
-function extractJson(text: string) {
+export async function generateSeasonalInspirationChips(options: {
+  currentDate?: string;
+  currentIdea?: string;
+  existingChips?: string[];
+  language?: BookLanguage;
+}) {
+  const language = options.language || "zh";
+  const parsedDate = options.currentDate ? new Date(options.currentDate) : new Date();
+  const date = Number.isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
+  const contextLabel = getSeasonalContext(date, language);
+  const fallback = fallbackInspirationChips(language, contextLabel, options.currentIdea || "", options.existingChips || []);
+
+  if (!hasBailianKey()) {
+    return { contextLabel, chips: fallback, source: "local" as const };
+  }
+
+  const sceneGuide = buildSceneFirstHeritageGuide(options.currentIdea || contextLabel, language);
+  const systemPrompt =
+    language === "en"
+      ? [
+          "You are Gui Xiaoling, an inspiration coach for elementary-school Guangxi picture books.",
+          "Create fresh one-sentence story idea chips for children ages 6-12.",
+          "Use the current season or holiday as the emotional hook, then choose Guangxi travel scenes and heritage elements that naturally fit.",
+          "Avoid repeating famous symbols by default. Do not use Zhuang brocade or bronze drums unless the idea itself clearly needs them.",
+          "Use child-friendly hooks such as games, riddles, nature watching, postcards, treasure hunts, songs, or class trips. Avoid romance or love-song wording.",
+          "Cover different Guangxi cities and places such as Baise, Chongzuo, Guilin, Liuzhou, Wuzhou, Beihai, Fangchenggang, Qinzhou, Hezhou, Hechi, and Sanjiang when appropriate.",
+          sceneGuide,
+          "Output JSON only."
+        ].join("\n")
+      : [
+          "你是桂小灵，负责给小学组孩子设计广西绘本灵感锦囊。",
+          "请创作新鲜的一句话儿童小故事灵感，适合 6-12 岁孩子继续做绘本。",
+          "先根据当前时令或节日找情绪钩子，再选择自然贴合的广西文旅场景和非遗元素。",
+          "不要默认使用壮锦或铜鼓，除非灵感本身明确需要。",
+          "故事钩子用游戏、谜题、自然观察、明信片、寻宝、童谣、班级出游等儿童视角，避免爱情或情歌表达。",
+          "尽量覆盖不同广西城市和地点，例如百色、崇左、桂林、柳州、梧州、北海、防城港、钦州、贺州、河池、三江等。",
+          sceneGuide,
+          "只输出 JSON。"
+        ].join("\n");
+
+  const userPrompt =
+    language === "en"
+      ? [
+          `Current context: ${contextLabel}`,
+          `Current student idea, if any: ${options.currentIdea || "none"}`,
+          `Avoid ideas too similar to these existing chips: ${(options.existingChips || []).join(" | ") || "none"}`,
+          "Return JSON with fields:",
+          "contextLabel: a short seasonal label",
+          "chips: exactly 6 short child-friendly story ideas, each 8-16 English words, diverse in place, heritage, and plot, no numbering.",
+          "At most 1 chip may continue the current student idea. The other 5 must change the place, heritage element, and plot hook."
+        ].join("\n")
+      : [
+          `当前时令：${contextLabel}`,
+          `当前孩子写下的灵感：${options.currentIdea || "无"}`,
+          `请避开这些已有锦囊的相似表达：${(options.existingChips || []).join(" | ") || "无"}`,
+          "请返回 JSON，字段：",
+          "contextLabel: 8 字以内的时令标签",
+          "chips: 正好 6 条中文灵感锦囊，每条 10-22 个字，地点、非遗、情节尽量不同，不要编号。",
+          "最多 1 条可以延续当前孩子的灵感，其余 5 条必须换地点、换非遗、换情节钩子。"
+        ].join("\n");
+
+  try {
+    const content = await chatCompletion([
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt }
+    ], { maxTokens: 520, model: inspirationTextModel(), temperature: 0.95, timeoutMs: 2800 });
+    const parsed = extractJsonValue<InspirationChipResponse>(content);
+    const generatedChips = normalizeInspirationChips(parsed.chips || [], language, false)
+      .filter((chip) => !isUnsupportedDefaultHeritage(chip, options.currentIdea || contextLabel));
+    const chips = pickDiverseInspirationChips(generatedChips.concat(fallback), options.existingChips || [], options.currentIdea || "", language);
+    return { contextLabel: parsed.contextLabel || contextLabel, chips, source: "bailian" as const };
+  } catch {
+    return { contextLabel, chips: fallback, source: "local" as const };
+  }
+}
+
+function extractJsonValue<T>(text: string) {
   const cleaned = text
     .replace(/^```json\s*/iu, "")
     .replace(/^```\s*/iu, "")
@@ -66,7 +152,11 @@ function extractJson(text: string) {
   if (start < 0 || end < 0 || end <= start) {
     throw new Error("AI response did not include JSON");
   }
-  return JSON.parse(cleaned.slice(start, end + 1)) as BookDraft;
+  return JSON.parse(cleaned.slice(start, end + 1)) as T;
+}
+
+function extractJson(text: string) {
+  return extractJsonValue<BookDraft>(text);
 }
 
 function useGuiXiaolingName(text = "", language: BookLanguage = "zh") {
@@ -162,23 +252,218 @@ function sceneFirstHeritageElements(idea: string, rawItems: string[], language: 
   return merged.slice(0, 5);
 }
 
-async function chatCompletion(messages: ChatMessage[]) {
+function getSeasonalContext(date = new Date(), language: BookLanguage = "zh") {
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+
+  if (month === 5 && day >= 20) {
+    return language === "en" ? "Children's Day is coming soon" : "六一儿童节快到了";
+  }
+  if (month === 6 && day <= 8) {
+    return language === "en" ? "Children's Day week" : "六一儿童节这一周";
+  }
+  if (month === 6 || month === 7 || month === 8) {
+    return language === "en" ? "early summer and summer vacation" : "初夏和暑假";
+  }
+  if (month === 9) {
+    return language === "en" ? "new school year" : "新学期开学季";
+  }
+  if (month === 10) {
+    return language === "en" ? "autumn travel season" : "秋游季";
+  }
+  if (month === 1 || month === 2) {
+    return language === "en" ? "winter vacation and Spring Festival" : "寒假和春节";
+  }
+  return language === "en" ? "today's season" : "最近的时令";
+}
+
+function fallbackInspirationChips(language: BookLanguage, contextLabel: string, currentIdea = "", existingChips: string[] = []) {
+  const childDay = /儿童节|Children/iu.test(contextLabel);
+  const summer = /夏|暑假|summer/iu.test(contextLabel);
+  const basePool =
+    language === "en"
+      ? childDay
+        ? [
+            "A Children's Day shell stage on Beihai Silver Beach",
+            "A Dong grand song gift under Sanjiang Wind-Rain Bridge",
+            "A Liu Sanjie chorus map drifting on the Li River",
+            "A Liuzhou luosifen aroma parade for my classmates",
+            "A Tianqin melody party beside Detian Waterfall",
+            "A Wuzhou Liubao tea postcard in Qilou City",
+            "A Baise red-scarf time mailbox beside Youjiang River",
+            "A Fangchenggang Jingzu one-string zither sea concert",
+            "A Qinzhou Nixing pottery birthday cup in Sanniang Bay",
+            "A Hezhou Huangyao Ancient Town shadow-play mission",
+            "A Hechi Maonan bamboo-hat parade for Children's Day",
+            "A Yulin Zhenwu Pavilion cloud staircase adventure"
+          ]
+        : summer
+          ? [
+              "A summer firefly map in Huangyao Ancient Town",
+              "A bamboo raft story song on the Li River",
+              "A shell-carving treasure hunt on Beihai Silver Beach",
+              "A Tianqin echo beside Detian Waterfall",
+              "A rice-field cloud game at Longji Terraces",
+              "A night-market culture clue in Liuzhou",
+              "A Wuzhou arcade street Liubao tea cooling station",
+              "A Baise mango orchard color clue",
+              "A Fangchenggang dolphin-message summer diary",
+              "A Qinzhou pottery workshop rainstorm rescue"
+            ]
+          : [
+              "A shell-carving secret on Beihai Silver Beach",
+              "A Dong grand song floating from Sanjiang Wind-Rain Bridge",
+              "A Li River mountain-song map with Gui Xiaoling",
+              "A Liuzhou food-market heritage clue",
+              "A Tianqin echo at Detian Waterfall",
+              "A Longji Terrace farming story in the clouds",
+              "A Wuzhou Liubao tea scent trail",
+              "A Baise Youjiang riverbank story box",
+              "A Qinzhou Nixing pottery color change",
+              "A Fangchenggang Jingzu sea-song clue"
+            ]
+      : childDay
+        ? [
+            "六一儿童节在北海银滩搭起贝雕小舞台",
+            "三江风雨桥下把侗族大歌送给小伙伴",
+            "漓江竹筏上的刘三姐童声合唱地图",
+            "柳州螺蛳粉香气里的儿童节游园会",
+            "德天瀑布边响起天琴生日派对",
+            "梧州骑楼城寄出六堡茶香明信片",
+            "百色右江边的红领巾时光信箱",
+            "防城港白浪滩上的独弦琴海风音乐会",
+            "钦州坭兴陶杯装下三娘湾的海浪",
+            "贺州黄姚古镇里的皮影寻路任务",
+            "河池毛南花竹帽带来六一巡游",
+            "玉林真武阁楼梯变成云朵迷宫",
+            "贵港荷花池里开出会讲故事的莲灯",
+            "来宾圣堂山云海送来瑶族童话信",
+            "崇左花山岩画小人跳出红色舞步"
+          ]
+        : summer
+          ? [
+              "黄姚古镇里的暑假萤火虫地图",
+              "漓江竹筏上的夏日山歌漂流",
+              "北海银滩上的贝雕寻宝小队",
+              "德天瀑布边的天琴回声邮局",
+              "龙脊梯田云朵里的农耕游戏",
+              "柳州夜市里的非遗味道线索",
+              "梧州骑楼街的六堡茶清凉驿站",
+              "百色芒果园里的颜色密码",
+              "防城港海边收到京族哈节邀请",
+              "钦州坭兴陶工坊里的雨天救援",
+              "贺州姑婆山瀑布藏着森林歌谱",
+              "河池小朋友戴花竹帽追云影"
+            ]
+          : [
+              "北海银滩上的贝雕秘密",
+              "三江风雨桥飘来的侗族大歌",
+              "桂小灵和漓江上的山歌地图",
+              "柳州美食集市里的非遗线索",
+              "德天瀑布边的天琴回声",
+              "龙脊梯田云朵里的农耕故事",
+              "梧州六堡茶香飘进骑楼小巷",
+              "百色右江岸边的故事盒子",
+              "钦州坭兴陶变出海浪颜色",
+              "防城港京族海歌带来贝壳信",
+              "贺州黄姚古镇月光下的豆豉香",
+              "河池毛南花竹帽找到彩虹路"
+            ];
+
+  return pickDiverseInspirationChips(basePool, existingChips, currentIdea, language);
+}
+
+function normalizeInspirationChips(items: string[], language: BookLanguage, shouldLimit = true) {
+  const maxLength = language === "en" ? 96 : 34;
+  const cleaned = items
+    .map((item) => useGuiXiaolingName(String(item || ""), language).replace(/[。.!！]+$/u, "").trim())
+    .filter((item) => item.length >= 6 && item.length <= maxLength)
+    .filter((item) => !/情歌|爱情|恋爱|romance|love song/iu.test(item))
+    .filter((item) => !isUnsupportedDefaultHeritage(item, item))
+    .filter((item, index, array) => array.indexOf(item) === index);
+  return shouldLimit ? cleaned.slice(0, 6) : cleaned;
+}
+
+function chipTokens(text: string) {
+  return new Set(
+    text
+      .replace(/[，。！？、,.!?]/gu, "")
+      .split(/(?=[\s\S])/u)
+      .filter((char) => char.trim())
+  );
+}
+
+function isSimilarChip(candidate: string, existing: string[]) {
+  const cityOrScene = candidate.match(/百色|崇左|桂林|柳州|梧州|北海|防城港|钦州|贺州|河池|三江|龙脊|德天|黄姚|青秀山|银滩|漓江|骑楼|右江|花山|真武阁|圣堂山/u)?.[0];
+  const storySignal = candidate.match(/三月三|歌圩|绣球|山歌|壮锦|铜鼓|刘三姐|贝雕|侗族大歌|螺蛳粉|天琴|六堡茶|红领巾|独弦琴|坭兴陶|皮影|花竹帽|花山岩画|蜡染|五色糯米饭/u)?.[0];
+  return existing.some((item) => {
+    if (item === candidate) {
+      return true;
+    }
+    if (cityOrScene && item.includes(cityOrScene)) {
+      return true;
+    }
+    if (storySignal && item.includes(storySignal)) {
+      return true;
+    }
+    const left = chipTokens(candidate);
+    const right = chipTokens(item);
+    const overlap = [...left].filter((token) => right.has(token)).length;
+    return overlap / Math.max(1, Math.min(left.size, right.size)) > 0.62;
+  });
+}
+
+function pickDiverseInspirationChips(items: string[], existingChips: string[], currentIdea: string, language: BookLanguage) {
+  const seed = currentIdea || existingChips.join("|") || getSeasonalContext(new Date(), language);
+  const candidates = rotateList(normalizeInspirationChips(items, language, false), seed);
+  const avoidChips = existingChips.concat(currentIdea ? [currentIdea] : []);
+  const picked: string[] = [];
+  for (const candidate of candidates) {
+    if (picked.length >= 6) {
+      break;
+    }
+    if (!isSimilarChip(candidate, avoidChips.concat(picked))) {
+      picked.push(candidate);
+    }
+  }
+  return picked.concat(candidates.filter((candidate) => !picked.includes(candidate))).slice(0, 6);
+}
+
+function rotateList<T>(items: T[], seed: string) {
+  if (!items.length) {
+    return items;
+  }
+  const start = [...seed].reduce((sum, char) => sum + char.codePointAt(0)!, 0) % items.length;
+  return items.slice(start).concat(items.slice(0, start));
+}
+
+async function chatCompletion(
+  messages: ChatMessage[],
+  options?: { maxTokens?: number; model?: string; temperature?: number; timeoutMs?: number }
+) {
   if (!dashScopeKey()) {
     throw new Error("DASHSCOPE_API_KEY is missing");
   }
 
+  const controller = options?.timeoutMs ? new AbortController() : null;
+  const timeout = controller ? setTimeout(() => controller.abort(), options!.timeoutMs) : null;
   const response = await fetch(`${textBaseUrl()}/chat/completions`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${dashScopeKey()}`,
       "Content-Type": "application/json"
     },
+    signal: controller?.signal,
     body: JSON.stringify({
-      model: textModel(),
+      model: options?.model || textModel(),
       messages,
-      temperature: 0.78,
-      max_tokens: 2600
+      temperature: options?.temperature ?? 0.78,
+      max_tokens: options?.maxTokens || 2600
     })
+  }).finally(() => {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
   });
 
   const payload = (await response.json().catch(() => null)) as {

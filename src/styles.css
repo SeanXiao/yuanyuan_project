@@ -365,7 +365,25 @@ h3 {
   gap: 8px;
 }
 
-.inspiration-list div,
+.inspiration-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.inspiration-head > div {
+  display: grid;
+  gap: 1px;
+}
+
+.inspiration-head span {
+  color: #6f7d78;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.inspiration-chip-row,
 .tag-cluster {
   display: flex;
   flex-wrap: wrap;
@@ -387,6 +405,30 @@ h3 {
 
 .inspiration-list button:hover {
   background: #f1faf5;
+}
+
+.inspiration-list .discover-button {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 11px;
+  border-color: rgba(124, 191, 138, 0.34);
+  color: #2f785a;
+  background: #f1faf5;
+}
+
+.inspiration-list button:disabled {
+  cursor: not-allowed;
+  color: #8a958f;
+  background: #f5efe3;
+  box-shadow: none;
+  opacity: 0.76;
+}
+
+.discover-button:disabled svg {
+  animation: spin 1s linear infinite;
 }
 
 .archive {

@@ -2,7 +2,13 @@ import "dotenv/config";
 import express from "express";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createPictureBookDraft, generateAllPageImages, generatePageImage, getBailianRuntimeStatus } from "./bailian.js";
+import {
+  createPictureBookDraft,
+  generateAllPageImages,
+  generatePageImage,
+  generateSeasonalInspirationChips,
+  getBailianRuntimeStatus
+} from "./bailian.js";
 import { deleteBook, getBook, listBookSummaries, saveBook, toBookSummary, updateBook } from "./bookStore.js";
 import { buildSystemPrompt, chatWithMiniMax, synthesizeSpeech, type ChatMessage } from "./minimax.js";
 import { extractMemoriesFromText, loadMemory, rememberFacts } from "./memoryStore.js";
@@ -28,6 +34,21 @@ app.get("/api/health", (_request, response) => {
 
 app.get("/api/bailian/status", (_request, response) => {
   response.json(getBailianRuntimeStatus());
+});
+
+app.post("/api/inspiration-chips", async (request, response, next) => {
+  try {
+    const language = request.body?.language === "en" ? "en" : "zh";
+    const currentIdea = String(request.body?.currentIdea || "").trim().slice(0, 120);
+    const currentDate = String(request.body?.currentDate || "").trim();
+    const existingChips = Array.isArray(request.body?.existingChips)
+      ? request.body.existingChips.map((chip: unknown) => String(chip || "").trim()).filter(Boolean).slice(0, 12)
+      : [];
+    const result = await generateSeasonalInspirationChips({ currentDate, currentIdea, existingChips, language });
+    response.json(result);
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.get("/api/memory", async (_request, response, next) => {

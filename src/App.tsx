@@ -120,7 +120,7 @@ const emptyImageTasks: Record<number, ImageTaskStatus> = {
   4: "idle"
 };
 
-const inspirationChips = [
+const defaultInspirationChips = [
   "三月三歌圩上的会唱歌绣球",
   "漓江边的刘三姐山歌地图",
   "德天瀑布边的小小文旅推荐官",
@@ -338,6 +338,9 @@ export default function App() {
   const [protagonistGender, setProtagonistGender] = useState<ProtagonistGender>("girl");
   const [activeTab, setActiveTab] = useState<"book" | "prompts">("book");
   const [generationProgress, setGenerationProgress] = useState<GenerationProgress | null>(null);
+  const [inspirationChips, setInspirationChips] = useState(defaultInspirationChips);
+  const [inspirationContext, setInspirationContext] = useState("最近灵感");
+  const [isDiscoveringInspirations, setIsDiscoveringInspirations] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const workbenchRef = useRef<HTMLElement | null>(null);
   const workbenchBodyRef = useRef<HTMLDivElement | null>(null);
@@ -639,6 +642,48 @@ export default function App() {
     setNotice("绘本已从书架移走");
   }
 
+  function pickInspiration(chip: string) {
+    setIdea(chip);
+    setNotice("灵感已经放到书桌上，可以继续改写或开始做绘本");
+  }
+
+  async function discoverMoreInspirations() {
+    if (isDiscoveringInspirations || isGenerating) {
+      return;
+    }
+
+    setIsDiscoveringInspirations(true);
+    setNotice("桂小灵正在按最近节日和广西场景准备新锦囊");
+    try {
+      const response = await fetch("/api/inspiration-chips", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentDate: new Date().toISOString(),
+          currentIdea: idea.trim(),
+          existingChips: inspirationChips,
+          language: bookLanguage
+        })
+      });
+      const data = (await response.json()) as { chips?: string[]; contextLabel?: string; error?: string };
+      if (!response.ok || !data.chips?.length) {
+        throw new Error(data.error || "灵感锦囊生成失败");
+      }
+
+      const nextChips = data.chips.map(softenDisplayText).filter(Boolean).slice(0, 6);
+      setInspirationChips(nextChips);
+      setInspirationContext(data.contextLabel || "新的灵感");
+      setNotice(`已换成${data.contextLabel || "新的"}灵感锦囊，点一个就能放进故事灵感`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "灵感锦囊生成失败";
+      setInspirationChips(defaultInspirationChips);
+      setInspirationContext("本地灵感");
+      setNotice(`${message}，先用本地灵感锦囊`);
+    } finally {
+      setIsDiscoveringInspirations(false);
+    }
+  }
+
   function startListening() {
     if (!speechSupported || isGenerating) {
       setNotice("当前浏览器暂不支持语音输入，可以直接打字做绘本");
@@ -789,10 +834,19 @@ export default function App() {
           </form>
 
           <div className="inspiration-list">
-            <p className="eyebrow">灵感锦囊</p>
-            <div>
+            <div className="inspiration-head">
+              <div>
+                <p className="eyebrow">灵感锦囊</p>
+                <span>{inspirationContext}</span>
+              </div>
+              <button className="discover-button" type="button" onClick={() => void discoverMoreInspirations()} disabled={isGenerating || isDiscoveringInspirations}>
+                {isDiscoveringInspirations ? <LoaderCircle size={15} /> : <Sparkles size={15} />}
+                {isDiscoveringInspirations ? "构思中" : "发现更多"}
+              </button>
+            </div>
+            <div className="inspiration-chip-row">
               {inspirationChips.map((chip) => (
-                <button type="button" key={chip} onClick={() => setIdea(chip)}>
+                <button type="button" key={chip} onClick={() => pickInspiration(chip)} disabled={isGenerating}>
                   {chip}
                 </button>
               ))}
