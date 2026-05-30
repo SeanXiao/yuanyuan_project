@@ -1407,20 +1407,6 @@ h3 {
   line-height: 1.18;
 }
 
-.player-page-stamp {
-  display: inline-flex;
-  justify-self: start;
-  margin: 0;
-  padding: 7px 13px;
-  border: 1px solid rgba(233, 120, 91, 0.2);
-  border-radius: 999px;
-  color: #7e3426;
-  background: #fff1ea;
-  box-shadow: 0 6px 14px rgba(77, 62, 38, 0.06);
-  font-size: 0.82rem;
-  font-weight: 900;
-}
-
 .player-copy > p:not(.eyebrow) {
   margin: 0;
   color: #344a43;
@@ -1597,10 +1583,6 @@ h3 {
   .player-controls .secondary-button,
   .player-controls .primary-button {
     flex: 1 1 140px;
-  }
-
-  .player-page-dots {
-    flex-direction: column;
   }
 
   .step-track,

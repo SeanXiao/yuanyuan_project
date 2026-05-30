@@ -1543,7 +1543,6 @@ function PictureBookPlayer({ book }: { book: PictureBook | null }) {
   const pages = book.pages.length ? book.pages : [];
   const page = pages[Math.min(pageIndex, Math.max(pages.length - 1, 0))];
   const pageCount = pages.length;
-  const currentPageNumber = page ? pageIndex + 1 : 0;
 
   async function playAllPages() {
     if (!pages.length || isAutoPlaying) {
@@ -1643,9 +1642,6 @@ function PictureBookPlayer({ book }: { book: PictureBook | null }) {
             )}
           </div>
           <article className="player-copy">
-            <p className="player-page-stamp">
-              {language === "en" ? `Page ${currentPageNumber} of ${pageCount}` : `第 ${currentPageNumber} 页 · 共 ${pageCount} 页`}
-            </p>
             <h2>{displayBookText(page.title, language)}</h2>
             <p>{displayBookText(page.text, language)}</p>
             {includeCultureNote ? (
@@ -1684,7 +1680,6 @@ function PictureBookPlayer({ book }: { book: PictureBook | null }) {
       )}
 
       <nav className="player-page-dots" aria-label="绘本页码">
-        <span>{language === "en" ? `Page ${currentPageNumber} of ${pageCount}` : `第 ${currentPageNumber} 页 · 共 ${pageCount} 页`}</span>
         <div>
           {pages.map((item, index) => (
             <button
