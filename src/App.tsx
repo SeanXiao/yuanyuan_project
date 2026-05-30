@@ -126,7 +126,7 @@ const defaultInspirationChips = [
   "德天瀑布边的小小文旅推荐官",
   "三江风雨桥里的侗族大歌",
   "北海银滩上的贝雕寻宝记",
-  "柳州螺蛳粉香气里的非遗集市"
+  "柳州螺蛳粉香气里的文化集市"
 ];
 
 function getAppRoute(): AppRoute {
@@ -182,15 +182,33 @@ function splitSpeechText(text: string) {
     .filter(Boolean);
 }
 
-async function speakWithBrowser(text: string, language: BookLanguage = "zh") {
+let browserSpeechRunId = 0;
+let resolveCurrentSpeech: (() => void) | null = null;
+
+function stopBrowserSpeech() {
+  browserSpeechRunId += 1;
+  resolveCurrentSpeech?.();
+  resolveCurrentSpeech = null;
+  window.speechSynthesis?.cancel();
+}
+
+async function speakWithBrowser(text: string, language: BookLanguage = "zh", options?: { shouldContinue?: () => boolean }) {
   if (!window.speechSynthesis) {
     return;
   }
 
-  window.speechSynthesis.cancel();
+  stopBrowserSpeech();
+  const runId = browserSpeechRunId;
+  const shouldKeepSpeaking = () => runId === browserSpeechRunId && (options?.shouldContinue?.() ?? true);
   const voice = pickWarmVoice(await getBrowserVoices(), language);
+  if (!shouldKeepSpeaking()) {
+    return;
+  }
   const chunks = splitSpeechText(text);
   for (const [index, chunk] of chunks.entries()) {
+    if (!shouldKeepSpeaking()) {
+      break;
+    }
     const utterance = new SpeechSynthesisUtterance(chunk);
     utterance.lang = voice?.lang || (language === "en" ? "en-US" : "zh-CN");
     utterance.voice = voice;
@@ -198,9 +216,24 @@ async function speakWithBrowser(text: string, language: BookLanguage = "zh") {
     utterance.pitch = 1.03;
     window.speechSynthesis.speak(utterance);
     await new Promise<void>((resolve) => {
-      utterance.onend = () => window.setTimeout(resolve, index < chunks.length - 1 ? 80 : 0);
-      utterance.onerror = () => resolve();
+      let settled = false;
+      const finish = () => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        if (resolveCurrentSpeech === finish) {
+          resolveCurrentSpeech = null;
+        }
+        resolve();
+      };
+      resolveCurrentSpeech = finish;
+      utterance.onend = () => window.setTimeout(finish, shouldKeepSpeaking() && index < chunks.length - 1 ? 80 : 0);
+      utterance.onerror = finish;
     });
+    if (!shouldKeepSpeaking()) {
+      break;
+    }
   }
 }
 
@@ -330,7 +363,7 @@ export default function App() {
   const [idea, setIdea] = useState("我想写一个小朋友在三月三歌圩上遇到会唱山歌的绣球。");
   const [books, setBooks] = useState<PictureBookSummary[]>([]);
   const [activeBook, setActiveBook] = useState<PictureBook | null>(null);
-  const [notice, setNotice] = useState("写下一句灵感，桂小灵陪你做一本广西非遗绘本");
+  const [notice, setNotice] = useState("写下一句灵感，桂小灵陪你做一本广西文化绘本");
   const [isGenerating, setIsGenerating] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [shouldGenerateImage, setShouldGenerateImage] = useState(true);
@@ -434,7 +467,7 @@ export default function App() {
     setActiveTab("book");
     setActiveBook(null);
     setGenerationProgress(
-      makeProgress("understanding", "正在把灵感写进故事本", "桂小灵正在找主角、广西非遗和旅行地点。")
+      makeProgress("understanding", "正在把灵感写进故事本", "桂小灵正在找主角、广西文化亮点和旅行地点。")
     );
     setNotice("桂小灵正在读你的灵感，马上开始整理故事");
     try {
@@ -444,7 +477,7 @@ export default function App() {
               ...current,
               stage: "story",
               title: "正在整理故事",
-              detail: "桂小灵正在整理标题、4 页故事、非遗小知识和小学生讲解词。"
+              detail: "桂小灵正在整理标题、4 页故事、文化小发现和小学生讲解词。"
             }
           : current
       );
@@ -504,7 +537,7 @@ export default function App() {
                 title: failedCount ? "故事书已装订完成，部分插图可再画" : "故事书已装订完成",
                 detail: failedCount
                   ? `有 ${failedCount} 页插图还没画好，故事已先放进绘本。`
-                  : "4 页故事、插图和非遗小知识都已经放进绘本里了。",
+                  : "4 页故事、插图和文化小发现都已经放进绘本里了。",
                 error: failedCount ? "部分插图还没画好" : undefined
               }
             : current
@@ -519,7 +552,7 @@ export default function App() {
                 active: false,
                 stage: "archive",
                 title: "故事书已装订完成",
-                detail: "已保存故事、非遗小知识和创作记录；需要插图时可以单页补画。"
+                detail: "已保存故事、文化小发现和创作记录；需要插图时可以单页补画。"
               }
             : current
         );
@@ -721,7 +754,7 @@ export default function App() {
     recognitionRef.current = recognition;
     recognition.start();
     setIsListening(true);
-    setNotice("我在听，请说出你的广西非遗旅行故事灵感");
+    setNotice("我在听，请说出你的广西文化旅行故事灵感");
   }
 
   function stopListening() {
@@ -765,7 +798,7 @@ export default function App() {
               value={idea}
               onChange={(event) => setIdea(event.target.value)}
               disabled={isGenerating}
-              placeholder="写下你想去的地方、想看的非遗，或一个小小的故事开头……"
+              placeholder="写下你想去的地方、想了解的文化亮点，或一个小小的故事开头……"
             />
             <div className="language-switch" aria-label="绘本语言">
               <span>绘本语言</span>
@@ -944,7 +977,7 @@ export default function App() {
               <section className="empty-workbench">
                 <Paintbrush size={42} />
                 <h2>从一句灵感开始</h2>
-                <p>输入或说出一个广西非遗旅行故事，桂小灵会帮你整理成 4 页绘本、插图和小小讲解词。</p>
+                <p>输入或说出一个广西文化旅行故事，桂小灵会帮你整理成 4 页绘本、插图和小小讲解词。</p>
               </section>
             )}
           </div>
@@ -1043,7 +1076,7 @@ function getCulturePanelCopy(language: BookLanguage) {
 
   return {
     title: "广西文化小知识",
-    subtitle: "贴在绘本里的非遗小发现",
+    subtitle: "贴在绘本里的文化小发现",
     guideLabel: "小小文旅推荐官",
     noteLabel: "每页的小发现"
   };
@@ -1129,13 +1162,16 @@ function PictureBookPlayer({ book }: { book: PictureBook | null }) {
   const autoPlayRef = useRef(false);
 
   useEffect(() => {
+    autoPlayRef.current = false;
+    setIsAutoPlaying(false);
+    stopBrowserSpeech();
     setPageIndex(0);
   }, [book?.id]);
 
   useEffect(() => {
     return () => {
       autoPlayRef.current = false;
-      window.speechSynthesis?.cancel();
+      stopBrowserSpeech();
     };
   }, []);
 
@@ -1170,14 +1206,24 @@ function PictureBookPlayer({ book }: { book: PictureBook | null }) {
     autoPlayRef.current = true;
     setIsAutoPlaying(true);
     try {
-      await speakWithBrowser(cleanSpeechPart(softenDisplayText(currentBook.title)), language);
+      await speakWithBrowser(cleanSpeechPart(softenDisplayText(currentBook.title)), language, {
+        shouldContinue: () => autoPlayRef.current
+      });
       for (const [index, item] of pages.entries()) {
         if (!autoPlayRef.current) {
           break;
         }
         setPageIndex(index);
         await new Promise((resolve) => window.setTimeout(resolve, 260));
-        await speakWithBrowser(buildPageReadText(currentBook, item, includeCultureNote), language);
+        if (!autoPlayRef.current) {
+          break;
+        }
+        await speakWithBrowser(buildPageReadText(currentBook, item, includeCultureNote), language, {
+          shouldContinue: () => autoPlayRef.current
+        });
+        if (!autoPlayRef.current) {
+          break;
+        }
         await new Promise((resolve) => window.setTimeout(resolve, 360));
       }
     } finally {
@@ -1189,7 +1235,18 @@ function PictureBookPlayer({ book }: { book: PictureBook | null }) {
   function stopAutoPlay() {
     autoPlayRef.current = false;
     setIsAutoPlaying(false);
-    window.speechSynthesis?.cancel();
+    stopBrowserSpeech();
+  }
+
+  function readCurrentPage() {
+    autoPlayRef.current = false;
+    setIsAutoPlaying(false);
+    void speakWithBrowser(buildPageReadText(currentBook, page, includeCultureNote), language);
+  }
+
+  function goToPage(nextIndex: number) {
+    stopAutoPlay();
+    setPageIndex(Math.min(pageCount - 1, Math.max(0, nextIndex)));
   }
 
   return (
@@ -1245,18 +1302,18 @@ function PictureBookPlayer({ book }: { book: PictureBook | null }) {
               </div>
             ) : null}
             <div className="player-controls">
-              <button className="secondary-button" type="button" onClick={() => setPageIndex((current) => Math.max(0, current - 1))} disabled={pageIndex === 0}>
+              <button className="secondary-button" type="button" onClick={() => goToPage(pageIndex - 1)} disabled={pageIndex === 0}>
                 <ChevronLeft size={18} />
                 上一页
               </button>
-              <button className="secondary-button" type="button" onClick={() => void speakWithBrowser(buildPageReadText(book, page, includeCultureNote), language)}>
+              <button className="secondary-button" type="button" onClick={readCurrentPage}>
                 <Volume2 size={18} />
                 听这一页
               </button>
               <button
                 className="secondary-button"
                 type="button"
-                onClick={() => setPageIndex((current) => Math.min(pageCount - 1, current + 1))}
+                onClick={() => goToPage(pageIndex + 1)}
                 disabled={pageIndex >= pageCount - 1}
               >
                 下一页

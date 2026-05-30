@@ -37,6 +37,8 @@ const heritageCatalog: SceneOption[] = [
   { name: "桂林米粉制作技艺", keywords: ["桂林", "米粉", "美食", "早餐", "rice noodle"] },
   { name: "龙脊梯田农耕文化", keywords: ["龙脊", "梯田", "农耕", "稻田", "春耕", "terrace"] },
   { name: "瑶族服饰", keywords: ["龙脊", "梯田", "瑶族", "红瑶", "服饰", "长发村"] },
+  { name: "百色芒果种植文化", keywords: ["百色", "芒果", "果园", "田东", "田阳", "右江", "mango"] },
+  { name: "右江壮族农耕生活", keywords: ["百色", "右江", "果园", "田园", "农耕", "mango"] },
   { name: "钦州坭兴陶烧制技艺", keywords: ["钦州", "坭兴陶", "陶", "陶器", "泥"] },
   { name: "壮锦织造技艺", keywords: ["壮锦", "织锦", "织造", "织布", "锦", "纹样", "brocade"] },
   { name: "铜鼓习俗", keywords: ["铜鼓", "鼓声", "鼓", "东兰", "河池", "bronze drum"] }
@@ -58,6 +60,8 @@ const tourismCatalog: SceneOption[] = [
   { name: "黄姚古镇", keywords: ["黄姚", "古镇", "贺州"] },
   { name: "柳州百里柳江", keywords: ["柳州", "柳江", "窑埠", "螺蛳粉"] },
   { name: "柳州窑埠古镇", keywords: ["柳州", "窑埠", "螺蛳粉", "集市", "夜市"] },
+  { name: "百色芒果园", keywords: ["百色", "芒果", "果园", "田东", "田阳"] },
+  { name: "百色右江河谷", keywords: ["百色", "右江", "河谷", "田园"] },
   { name: "崇左花山岩画景区", keywords: ["花山", "岩画", "崇左", "左江"] }
 ];
 
@@ -83,6 +87,13 @@ const cultureNotes: Record<string, string> = {
   桂林米粉制作技艺: "桂林米粉是桂林日常美食代表，能把城市味道自然带进绘本。",
   龙脊梯田农耕文化: "龙脊梯田体现山地农耕智慧，适合稻田、春耕和丰收故事。",
   瑶族服饰: "瑶族服饰色彩鲜明、刺绣精细，和龙脊梯田、红瑶村寨等场景很贴近。",
+  百色芒果种植文化: "百色芒果种植和右江河谷气候、果园生活相连，适合写采摘、观察和乡村旅行故事。",
+  右江壮族农耕生活: "右江流域有丰富的田园与民族生活记忆，适合把果园、河谷和儿童观察自然结合起来。",
+  百色芒果园自然观察: "百色芒果园能观察果树、花香、昆虫和采摘劳动，是认识地方物产和自然节律的好场景。",
+  百色右江河谷田园生活: "右江河谷有温暖气候、田园风光和果园生活，能让孩子从身边风景理解家乡特色。",
+  柳州柳江城市风景: "柳江穿城而过，桥梁、夜景和市井生活能展现柳州活泼的城市气质。",
+  南宁老街城市记忆: "老街里的骑楼、店铺和街巷故事，适合表现城市记忆与日常生活。",
+  北海银滩海洋观察: "银滩的浪花、贝壳、海风和潮汐，适合写儿童观察自然和保护海洋的故事。",
   钦州坭兴陶烧制技艺: "钦州坭兴陶以陶土、烧制和窑变见长，适合手作体验类故事。",
   壮锦织造技艺: "壮锦织造技艺图案鲜明、色彩丰富，适合织布、纹样和家传手艺故事。",
   铜鼓习俗: "铜鼓习俗和节庆、仪式、鼓声有关，适合真正出现鼓声或铜鼓线索的故事。"
@@ -115,7 +126,31 @@ function rotateOptions<T>(items: T[], seed: string) {
   return items.slice(start).concat(items.slice(0, start));
 }
 
-function pickSceneFirstElements(idea: string, catalog: SceneOption[], count: number) {
+function tourismCultureLabel(name: string) {
+  const labelMap: Record<string, string> = {
+    桂林山水: "桂林山水自然观察",
+    阳朔漓江: "漓江山水与竹筏生活",
+    德天跨国瀑布: "德天瀑布边境山水",
+    崇左明仕田园: "明仕田园喀斯特风光",
+    北海银滩: "北海银滩海洋观察",
+    合浦海丝首港: "合浦海丝港口故事",
+    三江程阳风雨桥: "三江风雨桥建筑观察",
+    三江鼓楼侗寨: "三江侗寨生活观察",
+    龙脊梯田: "龙脊梯田农耕风景",
+    河池东兰铜鼓文化景区: "河池山乡节庆观察",
+    南宁青秀山: "南宁青秀山自然观察",
+    南宁三街两巷: "南宁老街城市记忆",
+    黄姚古镇: "黄姚古镇生活美学",
+    柳州百里柳江: "柳州柳江城市风景",
+    柳州窑埠古镇: "柳州窑埠夜市生活",
+    百色芒果园: "百色芒果园自然观察",
+    百色右江河谷: "百色右江河谷田园生活",
+    崇左花山岩画景区: "崇左左江山水观察"
+  };
+  return labelMap[name] || `${name}文化观察`;
+}
+
+function pickSceneFirstElements(idea: string, catalog: SceneOption[], count: number, shouldSupplement = true) {
   const scored = catalog
     .map((option, index) => ({ option, index, score: scoreOption(idea, option) }))
     .sort((left, right) => right.score - left.score || left.index - right.index);
@@ -129,14 +164,17 @@ function pickSceneFirstElements(idea: string, catalog: SceneOption[], count: num
     idea
   );
 
-  return selected
-    .concat(supplement)
+  return (selected.length ? selected : shouldSupplement ? supplement : [])
     .slice(0, count)
     .map((option) => option.name);
 }
 
 export function chooseHeritageElements(idea: string, count = 3) {
-  return pickSceneFirstElements(idea, heritageCatalog, count);
+  const matched = pickSceneFirstElements(idea, heritageCatalog, count, false);
+  if (matched.length) {
+    return matched;
+  }
+  return chooseTourismElements(idea, count).map(tourismCultureLabel).slice(0, count);
 }
 
 export function chooseTourismElements(idea: string, count = 2) {
@@ -148,18 +186,18 @@ export function buildSceneFirstHeritageGuide(idea: string, language: BookLanguag
   const tourism = chooseTourismElements(idea, 3);
   if (language === "en") {
     return [
-      "Scene-first heritage rule: choose Guangxi heritage elements by reading the student's place, festival, food, sound, character, and action first.",
+      "Scene-first culture rule: choose Guangxi heritage elements only when they naturally fit. If no heritage element fits, introduce meaningful local highlights such as landscape, food, farming, city memory, architecture, ecology, or daily life.",
       "Do not use Zhuang brocade or bronze drum as default Guangxi symbols. Use them only when the idea mentions brocade, weaving, patterns, bronze drums, drum sounds, or a clearly related custom.",
       "Examples: Beihai/Silver Beach/sea -> Beihai shell carving, Hepu pearls, Tanka fishing songs; Sanyuesan/song fair/mountain songs/embroidered ball -> Zhuang Sanyuesan, Zhuang mountain songs, Zhuang embroidered ball, five-color sticky rice; Sanjiang/wind-rain bridge -> Dong grand song and Dong wooden architecture; Liuzhou/food -> Luosifen making craft; Guilin/Lijiang/Liu Sanjie -> Liu Sanjie ballads and Guilin rice noodles.",
-      `For this idea, prefer heritage such as: ${heritage.join(", ")}. Prefer travel scenes such as: ${tourism.join(", ")}.`
+      `For this idea, prefer culture highlights such as: ${heritage.join(", ")}. Prefer travel scenes such as: ${tourism.join(", ")}.`
     ].join("\n");
   }
 
   return [
-    "非遗选择原则：先读学生灵感里的地点、节日、食物、声音、人物和动作，再选择最应景的广西非遗/民族文化元素。",
+    "文化选择原则：先读学生灵感里的地点、节日、食物、声音、人物和动作；有自然贴合的非遗就介绍非遗，没有非遗也可以介绍有意义的地方亮点，如山水、物产、农耕、城市记忆、建筑、生态或日常生活。",
     "不要把壮锦、铜鼓当作默认广西符号；只有学生提到织锦、纹样、铜鼓、鼓声，或故事场景确实相关时才使用。",
     "示例：北海/银滩/海边 -> 北海贝雕、合浦南珠制作技艺、疍家渔歌；三月三/歌圩/山歌/绣球 -> 壮族三月三、壮族山歌、壮族绣球、五色糯米饭；三江/风雨桥 -> 侗族大歌、侗族木构建筑营造技艺；柳州/美食 -> 柳州螺蛳粉制作技艺；桂林/漓江/刘三姐 -> 刘三姐歌谣、桂林米粉制作技艺。",
-    `本次灵感优先考虑这些非遗：${heritage.join("、")}。文旅场景优先考虑：${tourism.join("、")}。`
+    `本次灵感优先考虑这些文化亮点：${heritage.join("、")}。文旅场景优先考虑：${tourism.join("、")}。`
   ].join("\n");
 }
 
@@ -204,7 +242,7 @@ function makeIllustrationPrompt(
       guiXiaolingVisualSpec(language),
       `Page theme: ${pageTitle}.`,
       `Story scene: ${pageText}`,
-      `Guangxi intangible heritage elements: ${heritage.join(", ")}.`,
+      `Guangxi cultural highlights: ${heritage.join(", ")}.`,
       `Guangxi cultural tourism elements: ${tourism.join(", ")}.`,
       "Layered composition, friendly expressions, Guangxi ethnic patterns, landscape and festival atmosphere, no text, no watermark, no real-person portrait."
     ].join("\n");
@@ -216,7 +254,7 @@ function makeIllustrationPrompt(
     guiXiaolingVisualSpec(language),
     `页面主题：${pageTitle}。`,
     `故事画面：${pageText}`,
-    `广西非遗元素：${heritage.join("、")}。`,
+      `广西文化亮点：${heritage.join("、")}。`,
     `广西文旅元素：${tourism.join("、")}。`,
     "画面有层次，角色表情友好，保留广西民族纹样、山水和节庆氛围，不要出现文字、水印或真实人物肖像。"
   ].join("\n");
@@ -260,7 +298,7 @@ function makeFallbackTitle(idea: string, language: BookLanguage) {
     return "风雨桥边的侗族大歌";
   }
   if (ideaIncludesAny(idea, ["柳州", "螺蛳粉"])) {
-    return "螺蛳粉香气里的非遗集市";
+    return "螺蛳粉香气里的文化集市";
   }
   if (ideaIncludesAny(idea, ["德天", "瀑布", "崇左"])) {
     return "瀑布边的天琴回声";
@@ -285,7 +323,7 @@ export function createFallbackBook(idea: string, language: BookLanguage = "zh", 
       `I shared my idea with Gui Xiaoling, and ${heritage[0]} became the first clue because it matched the place and mood of my story.`,
       `We arrived at ${tourism[0]}. The sounds, colors, and people there naturally led us to ${heritage[1]}, so the journey felt truly local.`,
       `On the road, I met a friend who wanted to know Guangxi better. With Gui Xiaoling's help, I introduced ${heritage[0]} and ${heritage[2]} in my own words.`,
-      `At the end, I turned the journey into a picture book and shared ${tourism[1]} with classmates, letting each heritage detail appear only where it belonged.`
+      `At the end, I turned the journey into a picture book and shared ${tourism[1]} with classmates, letting each local highlight appear only where it belonged.`
     ];
     const titles = ["A Bright Idea", "Into Guangxi", "Little Culture Guide", "My Picture Book"];
     const pages: PictureBookPage[] = pageTexts.map((text, index) => ({
@@ -297,12 +335,12 @@ export function createFallbackBook(idea: string, language: BookLanguage = "zh", 
       imageSource: "placeholder",
       cultureNote: getCultureNote(heritage[index % heritage.length], language)
     }));
-    const storyPrompt = `Turn the student's idea "${idea}" into a 4-page Guangxi intangible heritage and cultural tourism picture book in English.`;
+    const storyPrompt = `Turn the student's idea "${idea}" into a 4-page Guangxi culture and travel picture book in English. Use heritage only when it naturally fits.`;
 
     return {
       id,
       title,
-      subtitle: "A picture book where the scene chooses the heritage clue",
+      subtitle: "A picture book where the scene chooses the cultural clue",
       originalIdea: idea,
       language,
       protagonistGender,
@@ -311,16 +349,16 @@ export function createFallbackBook(idea: string, language: BookLanguage = "zh", 
       heritageElements: heritage,
       tourismElements: tourism,
       guidingQuestions: [
-        "Is the heritage element a friend, a clue, or a magical object in my story?",
+        "Is the local highlight a friend, a clue, or a magical object in my story?",
         "Which Guangxi place or culture do I want classmates to remember after reading?"
       ],
       outline: `The main character starts from one idea, travels through ${tourism.join(" and ")}, follows scene-matched clues such as ${heritage.join(", ")}, and finishes an original Guangxi picture book.`,
       pages,
       tourGuideScript: `Hello, I am a little cultural tourism guide. Today I want to introduce ${tourism.join(" and ")}. I chose ${heritage.join(", ")} because they fit this story scene. Welcome to Guangxi, and turn travel discoveries into your own stories.`,
-      studentReflection: "I learned that heritage should grow from the place, characters, and action in my story, not be added just because it is famous.",
+      studentReflection: "I learned that cultural highlights should grow from the place, characters, and action in my story, not be added just because they are famous.",
       aiContentRatio: 88,
       promptRecords: [
-        makePromptRecord("story", "Story Generation Prompt", storyPrompt, "Generated a 4-page picture book, outline, guide script, and heritage notes."),
+        makePromptRecord("story", "Story Generation Prompt", storyPrompt, "Generated a 4-page picture book, outline, guide script, and culture notes."),
         ...pages.map((page) => makePromptRecord("image", `Page ${page.pageNumber} Image Prompt`, page.imagePrompt, "Waiting for image generation or using a local demo illustration."))
       ]
     };
@@ -332,7 +370,7 @@ export function createFallbackBook(idea: string, language: BookLanguage = "zh", 
     `我把自己的灵感说给桂小灵听，${heritage[0]}成了第一条线索，因为它和这个地点、人物、心情最合拍。`,
     `我们来到了${tourism[0]}，这里的声音、颜色和人们的生活，自然而然把我们带向${heritage[1]}。`,
     `路上，我遇到一个想了解广西文化的小伙伴。我用桂小灵帮我整理的词语，向他介绍${heritage[0]}和${heritage[2]}。`,
-    `最后，我把今天的冒险创编成一本绘本，也把${tourism[1]}介绍给更多同学。每个非遗小发现都出现在最适合它的地方。`
+    `最后，我把今天的冒险创编成一本绘本，也把${tourism[1]}介绍给更多同学。每个文化小发现都出现在最适合它的地方。`
   ];
 
   const pages: PictureBookPage[] = pageTexts.map((text, index) => ({
@@ -345,12 +383,12 @@ export function createFallbackBook(idea: string, language: BookLanguage = "zh", 
     cultureNote: getCultureNote(heritage[index % heritage.length], language)
   }));
 
-  const storyPrompt = `请把小学生灵感“${idea}”创编成 4 页广西非遗文旅绘本。`;
+  const storyPrompt = `请把小学生灵感“${idea}”创编成 4 页广西文化文旅绘本；有自然贴合的非遗就介绍，没有就介绍有意义的地方亮点。`;
 
   return {
     id,
     title,
-    subtitle: "一本让场景先说话的广西非遗绘本",
+    subtitle: "一本让场景先说话的广西文化绘本",
     originalIdea: idea,
     language,
     protagonistGender,
@@ -359,16 +397,16 @@ export function createFallbackBook(idea: string, language: BookLanguage = "zh", 
     heritageElements: heritage,
     tourismElements: tourism,
     guidingQuestions: [
-      "这个非遗元素在故事里是朋友、线索，还是魔法道具？",
+      "这个文化亮点在故事里是朋友、线索，还是魔法道具？",
       "你希望读完故事的同学记住哪个广西景点或文化？"
     ],
-    outline: `主角从一句灵感出发，在${tourism.join("、")}之间冒险，根据地点和情节认识${heritage.join("、")}，最后完成自己的广西非遗文旅绘本。`,
+    outline: `主角从一句灵感出发，在${tourism.join("、")}之间冒险，根据地点和情节认识${heritage.join("、")}，最后完成自己的广西文化文旅绘本。`,
     pages,
     tourGuideScript: `大家好，我是小小文旅推荐官。今天我想介绍${tourism.join("和")}。我选择${heritage.join("、")}，是因为它们和这个故事的地点、声音、味道或行动最贴近。欢迎大家来广西，把旅途中的发现也创编成自己的故事。`,
-    studentReflection: "我发现非遗不是硬塞进故事里的标签，而是要从地点、人物和情节里自然长出来。",
+    studentReflection: "我发现文化亮点不是硬塞进故事里的标签，而是要从地点、人物和情节里自然长出来。",
     aiContentRatio: 88,
     promptRecords: [
-      makePromptRecord("story", "故事生成 Prompt", storyPrompt, "已生成 4 页绘本故事、大纲、文旅讲解和非遗知识。"),
+      makePromptRecord("story", "故事生成 Prompt", storyPrompt, "已生成 4 页绘本故事、大纲、文旅讲解和文化小发现。"),
       ...pages.map((page) => makePromptRecord("image", `第 ${page.pageNumber} 页图片 Prompt`, page.imagePrompt, "等待图片生成或使用本地演示插图。"))
     ]
   };

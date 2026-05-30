@@ -10,7 +10,7 @@ import {
   type PromptRecord,
   type ProtagonistGender
 } from "./bookStore.js";
-import { buildSceneFirstHeritageGuide, chooseHeritageElements, createFallbackBook } from "./guangxiFallback.js";
+import { buildSceneFirstHeritageGuide, chooseHeritageElements, chooseTourismElements, createFallbackBook } from "./guangxiFallback.js";
 
 type ChatMessage = {
   role: "system" | "user" | "assistant";
@@ -39,6 +39,23 @@ function textModel() {
   return process.env.BAILIAN_TEXT_MODEL || "qwen3.7-max";
 }
 
+function numberFromEnv(name: string, fallback: number) {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function storyTextModel() {
+  return process.env.BAILIAN_STORY_TEXT_MODEL || "qwen-turbo";
+}
+
+function storyTextMaxTokens() {
+  return numberFromEnv("BAILIAN_STORY_TEXT_MAX_TOKENS", 2600);
+}
+
+function storyTextTimeoutMs() {
+  return numberFromEnv("BAILIAN_STORY_TEXT_TIMEOUT_MS", 28000);
+}
+
 function inspirationTextModel() {
   return process.env.BAILIAN_INSPIRATION_TEXT_MODEL || process.env.BAILIAN_FAST_TEXT_MODEL || "qwen-turbo";
 }
@@ -59,6 +76,8 @@ export function getBailianRuntimeStatus() {
   return {
     configured: hasBailianKey(),
     textModel: textModel(),
+    storyTextModel: storyTextModel(),
+    storyTextTimeoutMs: storyTextTimeoutMs(),
     inspirationTextModel: inspirationTextModel(),
     imageModel: imageModel(),
     imageSize: imageSize()
@@ -87,7 +106,7 @@ export async function generateSeasonalInspirationChips(options: {
       ? [
           "You are Gui Xiaoling, an inspiration coach for elementary-school Guangxi picture books.",
           "Create fresh one-sentence story idea chips for children ages 6-12.",
-          "Use the current season or holiday as the emotional hook, then choose Guangxi travel scenes and heritage elements that naturally fit.",
+          "Use the current season or holiday as the emotional hook, then choose Guangxi travel scenes and cultural highlights that naturally fit.",
           "Avoid repeating famous symbols by default. Do not use Zhuang brocade or bronze drums unless the idea itself clearly needs them.",
           "Use child-friendly hooks such as games, riddles, nature watching, postcards, treasure hunts, songs, or class trips. Avoid romance or love-song wording.",
           "Cover different Guangxi cities and places such as Baise, Chongzuo, Guilin, Liuzhou, Wuzhou, Beihai, Fangchenggang, Qinzhou, Hezhou, Hechi, and Sanjiang when appropriate.",
@@ -97,7 +116,7 @@ export async function generateSeasonalInspirationChips(options: {
       : [
           "你是桂小灵，负责给小学组孩子设计广西绘本灵感锦囊。",
           "请创作新鲜的一句话儿童小故事灵感，适合 6-12 岁孩子继续做绘本。",
-          "先根据当前时令或节日找情绪钩子，再选择自然贴合的广西文旅场景和非遗元素。",
+          "先根据当前时令或节日找情绪钩子，再选择自然贴合的广西文旅场景和文化亮点。",
           "不要默认使用壮锦或铜鼓，除非灵感本身明确需要。",
           "故事钩子用游戏、谜题、自然观察、明信片、寻宝、童谣、班级出游等儿童视角，避免爱情或情歌表达。",
           "尽量覆盖不同广西城市和地点，例如百色、崇左、桂林、柳州、梧州、北海、防城港、钦州、贺州、河池、三江等。",
@@ -113,8 +132,8 @@ export async function generateSeasonalInspirationChips(options: {
           `Avoid ideas too similar to these existing chips: ${(options.existingChips || []).join(" | ") || "none"}`,
           "Return JSON with fields:",
           "contextLabel: a short seasonal label",
-          "chips: exactly 6 short child-friendly story ideas, each 8-16 English words, diverse in place, heritage, and plot, no numbering.",
-          "At most 1 chip may continue the current student idea. The other 5 must change the place, heritage element, and plot hook."
+          "chips: exactly 6 short child-friendly story ideas, each 8-16 English words, diverse in place, cultural highlight, and plot, no numbering.",
+          "At most 1 chip may continue the current student idea. The other 5 must change the place, cultural highlight, and plot hook."
         ].join("\n")
       : [
           `当前时令：${contextLabel}`,
@@ -122,8 +141,8 @@ export async function generateSeasonalInspirationChips(options: {
           `请避开这些已有锦囊的相似表达：${(options.existingChips || []).join(" | ") || "无"}`,
           "请返回 JSON，字段：",
           "contextLabel: 8 字以内的时令标签",
-          "chips: 正好 6 条中文灵感锦囊，每条 10-22 个字，地点、非遗、情节尽量不同，不要编号。",
-          "最多 1 条可以延续当前孩子的灵感，其余 5 条必须换地点、换非遗、换情节钩子。"
+          "chips: 正好 6 条中文灵感锦囊，每条 10-22 个字，地点、文化亮点、情节尽量不同，不要编号。",
+          "最多 1 条可以延续当前孩子的灵感，其余 5 条必须换地点、换文化亮点、换情节钩子。"
         ].join("\n");
 
   try {
@@ -159,7 +178,8 @@ function extractJson(text: string) {
   return extractJsonValue<BookDraft>(text);
 }
 
-function useGuiXiaolingName(text = "", language: BookLanguage = "zh") {
+function useGuiXiaolingName(value: unknown = "", language: BookLanguage = "zh") {
+  const text = Array.isArray(value) ? value.join(language === "en" ? ", " : "、") : String(value || "");
   if (!text) {
     return text;
   }
@@ -239,6 +259,18 @@ function isUnsupportedDefaultHeritage(item: string, idea: string) {
     return !ideaMentionsAny(idea, ["铜鼓", "鼓声", "鼓", "bronze drum", "drum"]);
   }
 
+  if (/绣球/iu.test(item)) {
+    return !ideaMentionsAny(idea, ["绣球", "抛绣球", "三月三", "歌圩"]);
+  }
+
+  if (/山歌|刘三姐/iu.test(item)) {
+    return !ideaMentionsAny(idea, ["山歌", "唱歌", "对歌", "歌圩", "三月三", "刘三姐", "漓江", "阳朔"]);
+  }
+
+  if (/三月三/iu.test(item)) {
+    return !ideaMentionsAny(idea, ["三月三", "歌圩", "节日"]);
+  }
+
   return false;
 }
 
@@ -250,6 +282,32 @@ function sceneFirstHeritageElements(idea: string, rawItems: string[], language: 
     .filter((item) => !isUnsupportedDefaultHeritage(item, idea));
   const merged = [...items, ...suggested].filter((item, index, array) => array.indexOf(item) === index);
   return merged.slice(0, 5);
+}
+
+function sceneFirstTourismElements(idea: string, rawItems: string[], language: BookLanguage) {
+  const suggested = chooseTourismElements(idea, 4);
+  const items = rawItems.map((item) => useGuiXiaolingName(item, language).trim()).filter(Boolean);
+  const sceneMatched = suggested.some((item) => ideaMentionsAny(idea, [item, ...item.split(/[、,，\s]+/u)]));
+  const merged = [...suggested, ...(sceneMatched ? [] : items)].filter((item, index, array) => array.indexOf(item) === index);
+  return merged.slice(0, 5);
+}
+
+function draftHasUnsupportedDefaultSignals(draft: BookDraft, idea: string) {
+  const text = [
+    draft.title,
+    draft.subtitle,
+    draft.outline,
+    draft.tourGuideScript,
+    draft.studentReflection,
+    ...(draft.heritageElements || []),
+    ...(draft.tourismElements || []),
+    ...(draft.pages || []).flatMap((page) => [page.title, page.text, page.cultureNote, page.imagePrompt])
+  ]
+    .map((item) => useGuiXiaolingName(item))
+    .join("\n");
+  return ["绣球", "山歌", "刘三姐", "三月三", "歌圩", "壮锦", "铜鼓"].some(
+    (item) => text.includes(item) && isUnsupportedDefaultHeritage(item, idea)
+  );
 }
 
 function getSeasonalContext(date = new Date(), language: BookLanguage = "zh") {
@@ -314,7 +372,7 @@ function fallbackInspirationChips(language: BookLanguage, contextLabel: string, 
               "A shell-carving secret on Beihai Silver Beach",
               "A Dong grand song floating from Sanjiang Wind-Rain Bridge",
               "A Li River mountain-song map with Gui Xiaoling",
-              "A Liuzhou food-market heritage clue",
+              "A Liuzhou food-market culture clue",
               "A Tianqin echo at Detian Waterfall",
               "A Longji Terrace farming story in the clouds",
               "A Wuzhou Liubao tea scent trail",
@@ -347,7 +405,7 @@ function fallbackInspirationChips(language: BookLanguage, contextLabel: string, 
               "北海银滩上的贝雕寻宝小队",
               "德天瀑布边的天琴回声邮局",
               "龙脊梯田云朵里的农耕游戏",
-              "柳州夜市里的非遗味道线索",
+              "柳州夜市里的文化味道线索",
               "梧州骑楼街的六堡茶清凉驿站",
               "百色芒果园里的颜色密码",
               "防城港海边收到京族哈节邀请",
@@ -359,7 +417,7 @@ function fallbackInspirationChips(language: BookLanguage, contextLabel: string, 
               "北海银滩上的贝雕秘密",
               "三江风雨桥飘来的侗族大歌",
               "桂小灵和漓江上的山歌地图",
-              "柳州美食集市里的非遗线索",
+              "柳州美食集市里的文化线索",
               "德天瀑布边的天琴回声",
               "龙脊梯田云朵里的农耕故事",
               "梧州六堡茶香飘进骑楼小巷",
@@ -437,6 +495,32 @@ function rotateList<T>(items: T[], seed: string) {
   return items.slice(start).concat(items.slice(0, start));
 }
 
+function normalizeChatContent(content: unknown) {
+  if (typeof content === "string") {
+    return content;
+  }
+  if (Array.isArray(content)) {
+    return content
+      .map((item) => {
+        if (typeof item === "string") {
+          return item;
+        }
+        if (item && typeof item === "object") {
+          const part = item as { content?: unknown; text?: unknown };
+          if (typeof part.text === "string") {
+            return part.text;
+          }
+          if (typeof part.content === "string") {
+            return part.content;
+          }
+        }
+        return "";
+      })
+      .join("");
+  }
+  return "";
+}
+
 async function chatCompletion(
   messages: ChatMessage[],
   options?: { maxTokens?: number; model?: string; temperature?: number; timeoutMs?: number }
@@ -467,7 +551,7 @@ async function chatCompletion(
   });
 
   const payload = (await response.json().catch(() => null)) as {
-    choices?: Array<{ message?: { content?: string } }>;
+    choices?: Array<{ message?: { content?: unknown } }>;
     error?: { message?: string };
   } | null;
 
@@ -475,7 +559,7 @@ async function chatCompletion(
     throw new Error(payload?.error?.message || `Bailian text request failed with HTTP ${response.status}`);
   }
 
-  const content = payload?.choices?.[0]?.message?.content;
+  const content = normalizeChatContent(payload?.choices?.[0]?.message?.content);
   if (!content) {
     throw new Error("Bailian text model returned empty content");
   }
@@ -494,7 +578,7 @@ function normalizeDraft(idea: string, draft: BookDraft, language: BookLanguage, 
     language,
     protagonistGender,
     heritageElements: sceneFirstHeritageElements(idea, rawHeritage, language),
-    tourismElements: (draft.tourismElements || fallback.tourismElements).slice(0, 5).map((item) => useGuiXiaolingName(item, language)),
+    tourismElements: sceneFirstTourismElements(idea, draft.tourismElements || fallback.tourismElements, language),
     guidingQuestions: (draft.guidingQuestions || fallback.guidingQuestions).slice(0, 3).map((item) => useGuiXiaolingName(item, language)),
     outline: useGuiXiaolingName(draft.outline || fallback.outline, language),
     pages: pages.map((page, index) => ({
@@ -523,24 +607,30 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
     language === "en"
       ? [
           "You are the AI creative coach for Guiyun Creator, serving elementary-school students.",
-          "Task: Turn a student's one-sentence idea into a Guangxi intangible-heritage and cultural-tourism AI picture book.",
+          "Task: Turn a student's one-sentence idea into a Guangxi culture and travel AI picture book.",
           "Perspective: Write from the student's point of view, emphasizing 'I create together with AI'. Do not sound like an adult managing a child.",
           `Student protagonist: use ${protagonistGender === "boy" ? "a boy" : "a girl"} as the story's elementary-school protagonist. ${protagonistVisualSpec("en", protagonistGender)}`,
           "Companion character: whenever the AI helper or robot helper appears in the story, its name must be Gui Xiaoling. Do not write generic names such as AI assistant, AI helper, assistant, or Xiaoyuan.",
-          "Content: Combine Guangxi intangible cultural heritage, cultural tourism, ethnic culture, and creative-writing growth.",
+          "Content: Combine Guangxi travel scenes, local culture, nature, food, daily life, and creative-writing growth. Use intangible heritage only when it naturally fits the scene.",
           sceneFirstGuide,
+          "Storyboard must stay centered on the preferred elements above. Do not suddenly switch to other famous Guangxi places or symbols unless the student idea mentions them.",
+          "Do not add Sanyuesan, song fairs, mountain songs, embroidered balls, Liu Sanjie, Zhuang brocade, or bronze drums unless those words or a clearly related scene appears in the student idea.",
+          "Each page must show concrete place, action, and cultural detail. Avoid vague wording such as only saying heritage, tradition, or secret.",
           "Safety: Suitable for ages 6-12. Avoid danger, horror, adult content, ads, or invented policy claims.",
           "Language: All reader-facing story fields must be in natural English. Guangxi names may keep Chinese proper nouns with simple English explanation when useful.",
           "Output: JSON only. No Markdown, no extra explanation."
         ].join("\n")
       : [
           "你是“桂韵创想家”的 AI 创编导师，服务对象是小学组学生。",
-          "任务：根据学生的一句话灵感，生成广西非遗文旅 AI 绘本。",
+          "任务：根据学生的一句话灵感，生成广西文化文旅 AI 绘本。",
           "视角：必须使用学生视角，强调“我和 AI 一起创作”，不要写成成人管理孩子。",
           `小学生主角：故事主角必须是${protagonistGender === "boy" ? "男孩" : "女孩"}。${protagonistVisualSpec("zh", protagonistGender)}`,
           "伙伴角色：如果故事里出现帮助我的 AI 或机器人助手，名字必须是“桂小灵”，不要写“AI小助手”“AI助手”“小助手”“小圆”。",
-          "内容：融合广西非遗、文旅、民族文化和创编能力训练。",
+          "内容：融合广西文旅场景、地方文化、自然风景、美食物产、日常生活和创编能力训练；只有自然贴合时才使用非遗。",
           sceneFirstGuide,
+          "4 页分镜必须围绕上面“本次灵感优先考虑”的元素推进，不要突然跳到其他知名广西地点或符号。",
+          "不要主动添加三月三、歌圩、山歌、绣球、刘三姐、壮锦、铜鼓，除非学生灵感明确出现这些词或高度相关场景。",
+          "每页必须有具体地点、人物动作和文化细节，避免只写“非遗文化”“传统技艺”“秘密”这类空泛表达。",
           "安全：适合 6-12 岁儿童，不出现危险、恐怖、成人化、商业广告或编造政策内容。",
           "语言：所有面向读者的故事字段必须使用自然中文。",
           "输出：只输出 JSON，不要解释，不要 Markdown。"
@@ -558,13 +648,14 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
           `protagonistGender: exactly "${protagonistGender}"`,
           `The elementary-school protagonist must be ${protagonistGender === "boy" ? "a boy" : "a girl"} throughout story text and image prompts.`,
           "If a helper robot appears in the story, call it Gui Xiaoling every time.",
-          "heritageElements: 2-5 scene-matched Guangxi intangible heritage / ethnic culture elements. Prefer fewer accurate elements over many famous but unrelated symbols.",
+          "heritageElements: 2-5 scene-matched Guangxi cultural highlights. They may be intangible heritage, local scenery, agriculture, food, ecology, architecture, city memory, or daily life. Prefer fewer accurate highlights over many famous but unrelated symbols.",
           "tourismElements: 2-5 Guangxi cultural tourism elements",
           "guidingQuestions: 2-3 questions that help the student continue creating, in English",
           "outline: story outline within 55 English words",
           "pages: an array of exactly 4 pages. Each page includes pageNumber, title, text, imagePrompt, cultureNote",
           "Each page text should be 35-60 English words, child-friendly and easy to read aloud.",
-          "Every heritage element must have a story reason: place, festival, food, sound, character action, or local life. Do not insert Zhuang brocade or bronze drums unless the student idea or chosen scene supports them.",
+          "Each page should be storyboard-ready: one clear visual moment, one action, and one concrete Guangxi detail.",
+          "Every cultural highlight must have a story reason: place, festival, food, sound, character action, nature, or local life. Do not insert Zhuang brocade or bronze drums unless the student idea or chosen scene supports them.",
           "tourGuideScript: a cultural tourism guide script within 90 English words, suitable for an elementary-school student to read aloud",
           "studentReflection: student reflection within 45 English words",
           "aiContentRatio: number from 80 to 95",
@@ -583,12 +674,13 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
           `protagonistGender: 固定为 "${protagonistGender}"`,
           `故事正文和图片 Prompt 中的小学生主角必须始终是${protagonistGender === "boy" ? "男孩" : "女孩"}。`,
           "如果故事里出现帮助我的机器人或 AI 伙伴，请每次都称呼它为“桂小灵”。",
-          "heritageElements: 2-5 个与场景贴合的广西非遗/民族文化元素。宁可少而准确，不要堆砌知名但无关的符号。",
+          "heritageElements: 2-5 个与场景贴合的广西文化亮点。可以是非遗，也可以是地方风景、物产农耕、美食、生态、建筑、城市记忆或日常生活。宁可少而准确，不要堆砌知名但无关的符号。",
           "tourismElements: 2-5 个广西文旅元素",
           "guidingQuestions: 2-3 个用于启发学生继续创编的问题",
           "outline: 80 字以内故事大纲",
           "pages: 4 页数组，每页包含 pageNumber, title, text, imagePrompt, cultureNote",
-          "每个非遗元素都必须有故事理由：地点、节日、食物、声音、人物行动或当地生活。不要为了“广西感”强行加入壮锦或铜鼓，除非学生灵感或场景自然支持。",
+          "每页正文要适合直接画成插图：一个清楚画面、一个动作、一个具体广西细节。",
+          "每个文化亮点都必须有故事理由：地点、节日、食物、声音、人物行动、自然观察或当地生活。不要为了“广西感”强行加入壮锦或铜鼓，除非学生灵感或场景自然支持。",
           "tourGuideScript: 小学生能朗读的 120 字以内文旅讲解词",
           "studentReflection: 60 字以内学生创作反思",
           "aiContentRatio: 80 到 95 的数字",
@@ -602,8 +694,11 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
     const content = await chatCompletion([
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt }
-    ]);
+    ], { maxTokens: storyTextMaxTokens(), model: storyTextModel(), temperature: 0.72, timeoutMs: storyTextTimeoutMs() });
     const normalized = normalizeDraft(idea, extractJson(content), language, protagonistGender);
+    if (draftHasUnsupportedDefaultSignals(normalized, idea)) {
+      throw new Error("AI 草稿加入了与灵感不匹配的默认广西符号，已切换为应景草稿。");
+    }
     const timestamp = nowIso();
     return {
       ...normalized,
@@ -637,7 +732,7 @@ async function createPlaceholderImage(book: PictureBook, page: PictureBookPage) 
   await mkdir(generatedDir, { recursive: true });
   const fileName = `${book.id}-page-${page.pageNumber}-placeholder.svg`;
   const filePath = join(generatedDir, fileName);
-  const heritage = escapeSvgText(book.heritageElements.join(" / "));
+  const cultureHighlights = escapeSvgText(book.heritageElements.join(" / "));
   const tourism = escapeSvgText(book.tourismElements.join(" / "));
   const title = escapeSvgText(page.title);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="900" viewBox="0 0 1280 900">
@@ -669,7 +764,7 @@ async function createPlaceholderImage(book: PictureBook, page: PictureBookPage) 
   <g transform="translate(548 254)">
     <rect x="0" y="0" width="530" height="322" rx="28" fill="#fffaf0" opacity=".94"/>
     <text x="42" y="76" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="50" font-weight="700" fill="#23343a">${title}</text>
-    <text x="42" y="150" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="28" fill="#38625d">广西非遗：${heritage}</text>
+    <text x="42" y="150" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="28" fill="#38625d">文化亮点：${cultureHighlights}</text>
     <text x="42" y="210" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="28" fill="#38625d">文旅场景：${tourism}</text>
     <text x="42" y="270" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="24" fill="#8a4e30">等待百炼图片生成时，使用本地演示插图</text>
   </g>
@@ -765,10 +860,10 @@ function buildCoherentImagePrompt(book: PictureBook, page: PictureBookPage) {
     `统一视觉设定：同一位小学生主角贯穿四页。${protagonistVisualSpec(book.language || "zh", protagonistGender)}`,
     `统一伙伴角色设定：每页都让桂小灵作为画册机器人小伙伴自然出现在画面中。${guiXiaolingVisualSpec(book.language || "zh")}`,
     "统一画风：温暖明亮的儿童绘本插画，细腻水彩质感，柔和光线，广西民族纹样可以作为小面积装饰，画面适合小学组展示。",
-    "非遗呈现原则：只画当前页正文和文化提示里自然出现的文化元素，不要为了广西感额外加入壮锦、铜鼓或其他无关符号。",
+    "文化呈现原则：只画当前页正文和文化提示里自然出现的文化亮点；有非遗就自然表现，没有非遗就表现风景、物产、农耕、城市生活等有意义内容，不要为了广西感额外加入壮锦、铜鼓或其他无关符号。",
     "文字限制硬性要求：画面里绝对不要出现任何文字、汉字、英文字母、标题、横幅、标牌、页码、字幕、水印或 Logo；不要把下面的标题信息画进图片。",
     "统一限制：不要出现真实人物肖像；不要改变主角长相、年龄、服装和整体画风。",
-    `全书非遗元素：${book.heritageElements.join("、")}`,
+    `全书文化亮点：${book.heritageElements.join("、")}`,
     `全文旅元素：${book.tourismElements.join("、")}`,
     `全书页目仅供角色一致性参考，不要画成分镜：${context}`,
     `当前只绘制第 ${page.pageNumber} 页对应的单个故事画面，页标题仅供理解，不得出现在画面中。`,
