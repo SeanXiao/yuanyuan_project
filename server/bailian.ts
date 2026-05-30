@@ -45,7 +45,7 @@ function numberFromEnv(name: string, fallback: number) {
 }
 
 function storyTextModel() {
-  return process.env.BAILIAN_STORY_TEXT_MODEL || process.env.BAILIAN_TEXT_MODEL || "qwen-plus";
+  return process.env.BAILIAN_STORY_TEXT_MODEL || process.env.BAILIAN_TEXT_MODEL || "deepseek-v4-pro";
 }
 
 function storyTextMaxTokens() {
@@ -61,11 +61,11 @@ function inspirationTextModel() {
 }
 
 function imageModel() {
-  return process.env.BAILIAN_IMAGE_MODEL || "wan2.7-image-pro";
+  return process.env.BAILIAN_IMAGE_MODEL || "qwen-image-max";
 }
 
 function imageSize() {
-  return process.env.BAILIAN_IMAGE_SIZE || "2K";
+  return process.env.BAILIAN_IMAGE_SIZE || "1024*1024";
 }
 
 export function hasBailianKey() {
@@ -193,6 +193,8 @@ function useGuiXiaolingName(value: unknown = "", language: BookLanguage = "zh") 
   }
 
   return text
+    .replace(/AI\s*伙伴(?=桂小灵)/gu, "")
+    .replace(/AI\s*伙伴/gu, "桂小灵")
     .replace(/AI\s*小助手/gu, "桂小灵")
     .replace(/AI\s*助手/gu, "桂小灵")
     .replace(/智能小助手/gu, "桂小灵")
@@ -314,6 +316,9 @@ function cleanGeneratedText(value: unknown = "", language: BookLanguage = "zh") 
   return useGuiXiaolingName(value, language)
     .replace(/\b(undefined|null|nan)\b/giu, "")
     .replace(/未定义/gu, "")
+    .replace(/毛茸茸的小手/gu, "圆圆的小机械手")
+    .replace(/毛茸茸的手/gu, "圆润的机械手")
+    .replace(/毛茸茸/gu, "圆润")
     .replace(/和\s*([。！？!?；;，,])/gu, "$1")
     .replace(/与\s*([。！？!?；;，,])/gu, "$1")
     .replace(/\s+([。！？!?；;，,])/gu, "$1")
@@ -710,6 +715,7 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
           "Perspective: Write from the student's point of view, emphasizing 'I create together with AI'. Do not sound like an adult managing a child.",
           `Student protagonist: use ${protagonistGender === "boy" ? "a boy" : "a girl"} as the story's elementary-school protagonist. ${protagonistVisualSpec("en", protagonistGender)}`,
           "Companion character: whenever the AI helper or robot helper appears in the story, its name must be Gui Xiaoling. Do not write generic names such as AI assistant, AI helper, assistant, or Xiaoyuan.",
+          "Gui Xiaoling is a robot companion. Describe its round mechanical hands, glowing screen face, and white-blue body; never give it furry hands, paws, animal fur, or plush-animal body parts.",
           "Content: Combine Guangxi travel scenes, local culture, nature, food, daily life, and creative-writing growth. Use intangible heritage only when it naturally fits the scene.",
           sceneFirstGuide,
           "Fidelity rule: Preserve the student's named place, activity, object, food, animal, and mood. If the idea mentions Sanniang Bay, dolphins, crabs, beach barbecue, or another concrete detail, those details must drive the plot and must not be replaced by another Guangxi place.",
@@ -726,6 +732,7 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
           "视角：必须使用学生视角，强调“我和 AI 一起创作”，不要写成成人管理孩子。",
           `小学生主角：故事主角必须是${protagonistGender === "boy" ? "男孩" : "女孩"}。${protagonistVisualSpec("zh", protagonistGender)}`,
           "伙伴角色：如果故事里出现帮助我的 AI 或机器人助手，名字必须是“桂小灵”，不要写“AI小助手”“AI助手”“小助手”“小圆”。",
+          "桂小灵是机器人伙伴，可以描写圆圆的机械手、发光屏幕脸和白蓝机身；不要写毛茸茸的小手、爪子、动物绒毛或毛绒动物身体。",
           "内容：融合广西文旅场景、地方文化、自然风景、美食物产、日常生活和创编能力训练；只有自然贴合时才使用非遗。",
           sceneFirstGuide,
           "忠实原则：必须保留学生灵感里的具体地点、活动、物件、食物、动物和情绪。如果灵感写了三娘湾、海豚、螃蟹、海边烧烤等具体内容，这些内容必须推动故事，不能改写成百色、芒果园或其他无关广西地点。",
@@ -754,7 +761,7 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
           "guidingQuestions: 2-3 questions that help the student continue creating, in English",
           "outline: story outline within 55 English words",
           "pages: an array of exactly 4 pages. Each page includes pageNumber, title, text, imagePrompt, cultureNote",
-          "Each page text should be 55-85 English words, child-friendly and easy to read aloud. The full book should feel like a 50-70 second read-aloud story, not a short outline.",
+          "Each page text should target 70-100 English words, child-friendly and easy to read aloud. The full book should feel like a rich picture-book read-aloud story, not a short outline.",
           "Each page should be storyboard-ready: one clear visual moment, one action, and one concrete Guangxi detail.",
           "Every cultural highlight must have a story reason: place, festival, food, sound, character action, nature, or local life. Do not insert Zhuang brocade or bronze drums unless the student idea or chosen scene supports them.",
           "tourGuideScript: a cultural tourism guide script within 90 English words, suitable for an elementary-school student to read aloud",
@@ -780,7 +787,7 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
           "guidingQuestions: 2-3 个用于启发学生继续创编的问题",
           "outline: 80 字以内故事大纲",
           "pages: 4 页数组，每页包含 pageNumber, title, text, imagePrompt, cultureNote",
-          "每页正文必须 100-150 个中文字，整本读起来约 50-70 秒；不要缩水成一句提纲，也不要只写说明文字。",
+          "每页正文以 140-180 个中文字为目标，尽量不要超过 190 字；整本要像真正绘本朗读故事，不要缩水成一句提纲，也不要只写说明文字。",
           "每页正文要适合直接画成插图：一个清楚画面、一个动作、一个具体广西细节。",
           "每个文化亮点都必须有故事理由：地点、节日、食物、声音、人物行动、自然观察或当地生活。不要为了“广西感”强行加入壮锦或铜鼓，除非学生灵感或场景自然支持。",
           "tourGuideScript: 小学生能朗读的 120 字以内文旅讲解词",
@@ -814,7 +821,12 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
       createdAt: timestamp,
       updatedAt: timestamp,
       promptRecords: [
-        makePromptRecord("story", language === "en" ? "Bailian Story Prompt" : "百炼故事生成 Prompt", `${systemPrompt}\n\n${userPrompt}`, content),
+        makePromptRecord(
+          "story",
+          language === "en" ? "Bailian Story Prompt" : "百炼故事生成 Prompt",
+          `${systemPrompt}\n\n${userPrompt}`,
+          JSON.stringify(normalized, null, 2)
+        ),
         ...normalized.pages.map((page) =>
           makePromptRecord(
             "image",

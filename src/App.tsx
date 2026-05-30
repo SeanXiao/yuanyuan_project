@@ -166,9 +166,27 @@ function pickWarmVoice(voices: SpeechSynthesisVoice[], language: BookLanguage) {
   }
 
   const chineseVoices = voices.filter((voice) => /^zh/i.test(voice.lang) || /Chinese|Mandarin|普通话|中文/u.test(voice.name));
+  const warmFemaleNames = /Xiaoxiao|Xiaoyi|Ting[- ]?Ting|Tingting|Mei[- ]?Jia|Meijia|Sin[- ]?ji|Xiaochen|Xiaohan|晓晓|晓伊|婷婷|美佳/iu;
+  const harshOrMaleNames = /Yunxi|Yunjian|Yunyang|Yunhao|Yunxia|Yunfeng|Yu[- ]?shu|Eddy|Reed|Rocko|Shelley|Grandpa|男/iu;
+  const preferredChineseVoices = chineseVoices
+    .filter((voice) => !harshOrMaleNames.test(voice.name))
+    .sort((left, right) => {
+      const leftScore =
+        (warmFemaleNames.test(left.name) ? 100 : 0) +
+        (/zh-CN|cmn-Hans-CN/iu.test(left.lang) ? 20 : 0) +
+        (/Google|Microsoft|Apple/iu.test(left.name) ? 8 : 0) +
+        (left.localService ? 4 : 0);
+      const rightScore =
+        (warmFemaleNames.test(right.name) ? 100 : 0) +
+        (/zh-CN|cmn-Hans-CN/iu.test(right.lang) ? 20 : 0) +
+        (/Google|Microsoft|Apple/iu.test(right.name) ? 8 : 0) +
+        (right.localService ? 4 : 0);
+      return rightScore - leftScore;
+    });
   return (
-    chineseVoices.find((voice) => /Xiaoxiao|Xiaoyi|Tingting|Meijia|普通话|Mandarin/u.test(voice.name)) ||
-    chineseVoices.find((voice) => voice.localService) ||
+    preferredChineseVoices[0] ||
+    chineseVoices.find((voice) => warmFemaleNames.test(voice.name)) ||
+    chineseVoices.find((voice) => !harshOrMaleNames.test(voice.name) && voice.localService) ||
     chineseVoices[0] ||
     null
   );
@@ -184,22 +202,101 @@ function splitSpeechText(text: string) {
 
 let browserSpeechRunId = 0;
 let resolveCurrentSpeech: (() => void) | null = null;
+let currentSpeechAudio: HTMLAudioElement | null = null;
+let serverSpeechRetryAt = 0;
 
 function stopBrowserSpeech() {
   browserSpeechRunId += 1;
   resolveCurrentSpeech?.();
   resolveCurrentSpeech = null;
+  if (currentSpeechAudio) {
+    currentSpeechAudio.pause();
+    currentSpeechAudio.removeAttribute("src");
+    currentSpeechAudio.load();
+    currentSpeechAudio = null;
+  }
   window.speechSynthesis?.cancel();
 }
 
+async function speakWithServerVoice(text: string, shouldKeepSpeaking: () => boolean) {
+  if (Date.now() < serverSpeechRetryAt) {
+    throw new Error("Server TTS is cooling down");
+  }
+  if (!shouldKeepSpeaking()) {
+    return true;
+  }
+
+  const response = await fetch("/api/speech", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text })
+  });
+  const data = (await response.json()) as { audioUrl?: string; error?: string };
+  if (!response.ok || !data.audioUrl) {
+    throw new Error(data.error || "TTS failed");
+  }
+  if (!shouldKeepSpeaking()) {
+    return true;
+  }
+
+  const audio = new Audio(data.audioUrl);
+  currentSpeechAudio = audio;
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      if (resolveCurrentSpeech === finish) {
+        resolveCurrentSpeech = null;
+      }
+      if (currentSpeechAudio === audio) {
+        currentSpeechAudio = null;
+      }
+      resolve();
+    };
+    const fail = () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      if (resolveCurrentSpeech === finish) {
+        resolveCurrentSpeech = null;
+      }
+      if (currentSpeechAudio === audio) {
+        currentSpeechAudio = null;
+      }
+      reject(new Error("Audio playback failed"));
+    };
+    resolveCurrentSpeech = finish;
+    audio.onended = finish;
+    audio.onerror = fail;
+    void audio.play().catch(fail);
+  });
+  return true;
+}
+
 async function speakWithBrowser(text: string, language: BookLanguage = "zh", options?: { shouldContinue?: () => boolean }) {
+  stopBrowserSpeech();
+  const runId = browserSpeechRunId;
+  const shouldKeepSpeaking = () => runId === browserSpeechRunId && (options?.shouldContinue?.() ?? true);
+  if (language === "zh") {
+    try {
+      await speakWithServerVoice(text, shouldKeepSpeaking);
+      return;
+    } catch {
+      serverSpeechRetryAt = Date.now() + 10 * 60 * 1000;
+      if (!shouldKeepSpeaking()) {
+        return;
+      }
+    }
+  }
+
   if (!window.speechSynthesis) {
     return;
   }
 
-  stopBrowserSpeech();
-  const runId = browserSpeechRunId;
-  const shouldKeepSpeaking = () => runId === browserSpeechRunId && (options?.shouldContinue?.() ?? true);
   const voice = pickWarmVoice(await getBrowserVoices(), language);
   if (!shouldKeepSpeaking()) {
     return;

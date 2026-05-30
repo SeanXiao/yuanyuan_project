@@ -36,6 +36,21 @@ app.get("/api/bailian/status", (_request, response) => {
   response.json(getBailianRuntimeStatus());
 });
 
+app.post("/api/speech", async (request, response, next) => {
+  try {
+    const text = String(request.body?.text || "").trim();
+    if (!text) {
+      response.status(400).json({ error: "text is required" });
+      return;
+    }
+
+    const audio = await synthesizeSpeech(text);
+    response.json(audio);
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post("/api/inspiration-chips", async (request, response, next) => {
   try {
     const language = request.body?.language === "en" ? "en" : "zh";
