@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import {
   makePromptRecord,
   nowIso,
+  type BookLanguage,
   type PictureBook,
   type PictureBookPage,
   type PromptRecord
@@ -102,14 +103,15 @@ async function chatCompletion(messages: ChatMessage[]) {
   return content;
 }
 
-function normalizeDraft(idea: string, draft: BookDraft): BookDraft {
-  const fallback = createFallbackBook(idea);
+function normalizeDraft(idea: string, draft: BookDraft, language: BookLanguage): BookDraft {
+  const fallback = createFallbackBook(idea, language);
   const pages = Array.isArray(draft.pages) && draft.pages.length ? draft.pages.slice(0, 4) : fallback.pages;
 
   return {
     title: draft.title || fallback.title,
     subtitle: draft.subtitle || fallback.subtitle,
     originalIdea: idea,
+    language,
     heritageElements: (draft.heritageElements || fallback.heritageElements).slice(0, 5),
     tourismElements: (draft.tourismElements || fallback.tourismElements).slice(0, 5),
     guidingQuestions: (draft.guidingQuestions || fallback.guidingQuestions).slice(0, 3),
@@ -129,45 +131,79 @@ function normalizeDraft(idea: string, draft: BookDraft): BookDraft {
   };
 }
 
-export async function createPictureBookDraft(idea: string) {
-  const fallback = createFallbackBook(idea);
+export async function createPictureBookDraft(idea: string, language: BookLanguage = "zh") {
+  const fallback = createFallbackBook(idea, language);
   if (!hasBailianKey()) {
     return fallback;
   }
 
-  const systemPrompt = [
-    "你是“桂韵创想家”的 AI 创编导师，服务对象是小学组学生。",
-    "任务：根据学生的一句话灵感，生成广西非遗文旅 AI 绘本。",
-    "视角：必须使用学生视角，强调“我和 AI 一起创作”，不要写成成人管理孩子。",
-    "内容：融合广西非遗、文旅、民族文化和创编能力训练。",
-    "安全：适合 6-12 岁儿童，不出现危险、恐怖、成人化、商业广告或编造政策内容。",
-    "输出：只输出 JSON，不要解释，不要 Markdown。"
-  ].join("\n");
+  const systemPrompt =
+    language === "en"
+      ? [
+          "You are the AI creative coach for Guiyun Creator, serving elementary-school students.",
+          "Task: Turn a student's one-sentence idea into a Guangxi intangible-heritage and cultural-tourism AI picture book.",
+          "Perspective: Write from the student's point of view, emphasizing 'I create together with AI'. Do not sound like an adult managing a child.",
+          "Content: Combine Guangxi intangible cultural heritage, cultural tourism, ethnic culture, and creative-writing growth.",
+          "Safety: Suitable for ages 6-12. Avoid danger, horror, adult content, ads, or invented policy claims.",
+          "Language: All reader-facing story fields must be in natural English. Guangxi names may keep Chinese proper nouns with simple English explanation when useful.",
+          "Output: JSON only. No Markdown, no extra explanation."
+        ].join("\n")
+      : [
+          "你是“桂韵创想家”的 AI 创编导师，服务对象是小学组学生。",
+          "任务：根据学生的一句话灵感，生成广西非遗文旅 AI 绘本。",
+          "视角：必须使用学生视角，强调“我和 AI 一起创作”，不要写成成人管理孩子。",
+          "内容：融合广西非遗、文旅、民族文化和创编能力训练。",
+          "安全：适合 6-12 岁儿童，不出现危险、恐怖、成人化、商业广告或编造政策内容。",
+          "语言：所有面向读者的故事字段必须使用自然中文。",
+          "输出：只输出 JSON，不要解释，不要 Markdown。"
+        ].join("\n");
 
-  const userPrompt = [
-    `学生灵感：${idea}`,
-    "请生成一个 JSON 对象，字段必须包含：",
-    "title: 绘本标题",
-    "subtitle: 一句副标题",
-    "originalIdea: 原始灵感",
-    "heritageElements: 2-5 个广西非遗/民族文化元素",
-    "tourismElements: 2-5 个广西文旅元素",
-    "guidingQuestions: 2-3 个用于启发学生继续创编的问题",
-    "outline: 80 字以内故事大纲",
-    "pages: 4 页数组，每页包含 pageNumber, title, text, imagePrompt, cultureNote",
-    "tourGuideScript: 小学生能朗读的 120 字以内文旅讲解词",
-    "studentReflection: 60 字以内学生创作反思",
-    "aiContentRatio: 80 到 95 的数字",
-    "图片 Prompt 要适合儿童绘本、水彩或国潮插画风格，明确广西文化元素，不要文字、水印、真实人物肖像。",
-    "4 页图片 Prompt 必须保持同一位小学生主角、同一套服装、同一绘本画风和连续故事氛围，只改变每页场景与动作。"
-  ].join("\n");
+  const userPrompt =
+    language === "en"
+      ? [
+          `Student idea: ${idea}`,
+          "Generate one JSON object. Required fields:",
+          "title: picture book title in English",
+          "subtitle: one short subtitle in English",
+          "originalIdea: original idea",
+          "language: exactly \"en\"",
+          "heritageElements: 2-5 Guangxi intangible heritage / ethnic culture elements",
+          "tourismElements: 2-5 Guangxi cultural tourism elements",
+          "guidingQuestions: 2-3 questions that help the student continue creating, in English",
+          "outline: story outline within 55 English words",
+          "pages: an array of exactly 4 pages. Each page includes pageNumber, title, text, imagePrompt, cultureNote",
+          "Each page text should be 35-60 English words, child-friendly and easy to read aloud.",
+          "tourGuideScript: a cultural tourism guide script within 90 English words, suitable for an elementary-school student to read aloud",
+          "studentReflection: student reflection within 45 English words",
+          "aiContentRatio: number from 80 to 95",
+          "Image prompts should be in English or bilingual, suitable for children's picture books, watercolor or new-Chinese illustration style, with clear Guangxi cultural elements. No text, watermark, or real-person portrait.",
+          "The 4 image prompts must keep the same elementary-school protagonist, same outfit, same visual style, and continuous story mood. Only the scene and action change per page."
+        ].join("\n")
+      : [
+          `学生灵感：${idea}`,
+          "请生成一个 JSON 对象，字段必须包含：",
+          "title: 绘本标题",
+          "subtitle: 一句副标题",
+          "originalIdea: 原始灵感",
+          "language: 固定为 \"zh\"",
+          "heritageElements: 2-5 个广西非遗/民族文化元素",
+          "tourismElements: 2-5 个广西文旅元素",
+          "guidingQuestions: 2-3 个用于启发学生继续创编的问题",
+          "outline: 80 字以内故事大纲",
+          "pages: 4 页数组，每页包含 pageNumber, title, text, imagePrompt, cultureNote",
+          "tourGuideScript: 小学生能朗读的 120 字以内文旅讲解词",
+          "studentReflection: 60 字以内学生创作反思",
+          "aiContentRatio: 80 到 95 的数字",
+          "图片 Prompt 要适合儿童绘本、水彩或国潮插画风格，明确广西文化元素，不要文字、水印、真实人物肖像。",
+          "4 页图片 Prompt 必须保持同一位小学生主角、同一套服装、同一绘本画风和连续故事氛围，只改变每页场景与动作。"
+        ].join("\n");
 
   try {
     const content = await chatCompletion([
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt }
     ]);
-    const normalized = normalizeDraft(idea, extractJson(content));
+    const normalized = normalizeDraft(idea, extractJson(content), language);
     const timestamp = nowIso();
     return {
       ...normalized,
@@ -175,8 +211,15 @@ export async function createPictureBookDraft(idea: string) {
       createdAt: timestamp,
       updatedAt: timestamp,
       promptRecords: [
-        makePromptRecord("story", "百炼故事生成 Prompt", `${systemPrompt}\n\n${userPrompt}`, content),
-        ...normalized.pages.map((page) => makePromptRecord("image", `第 ${page.pageNumber} 页图片 Prompt`, page.imagePrompt, "等待图片生成。"))
+        makePromptRecord("story", language === "en" ? "Bailian Story Prompt" : "百炼故事生成 Prompt", `${systemPrompt}\n\n${userPrompt}`, content),
+        ...normalized.pages.map((page) =>
+          makePromptRecord(
+            "image",
+            language === "en" ? `Page ${page.pageNumber} Image Prompt` : `第 ${page.pageNumber} 页图片 Prompt`,
+            page.imagePrompt,
+            language === "en" ? "Waiting for image generation." : "等待图片生成。"
+          )
+        )
       ]
     };
   } catch (error) {

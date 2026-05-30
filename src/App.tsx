@@ -3,9 +3,13 @@ import {
   AlertCircle,
   BookOpen,
   Bot,
+  ChevronLeft,
+  ChevronRight,
   CheckCircle2,
   Clock,
+  ExternalLink,
   FileText,
+  Home,
   Image,
   LoaderCircle,
   Mic,
@@ -44,6 +48,7 @@ type PictureBook = {
   title: string;
   subtitle: string;
   originalIdea: string;
+  language?: BookLanguage;
   createdAt: string;
   updatedAt: string;
   heritageElements: string[];
@@ -62,6 +67,7 @@ type PictureBookSummary = {
   title: string;
   subtitle: string;
   updatedAt: string;
+  language?: BookLanguage;
   heritageElements: string[];
   tourismElements: string[];
   coverImageUrl: string;
@@ -73,6 +79,8 @@ type BailianStatus = {
   imageModel: string;
   imageSize: string;
 };
+
+type BookLanguage = "zh" | "en";
 
 type ImageTaskStatus = "idle" | "queued" | "running" | "done" | "error";
 
@@ -88,6 +96,15 @@ type GenerationProgress = {
   imageTasks: Record<number, ImageTaskStatus>;
   error?: string;
 };
+
+type AppRoute =
+  | {
+      mode: "studio";
+    }
+  | {
+      mode: "player";
+      bookId: string;
+    };
 
 const stageLabels: Record<ProgressStage, string> = {
   understanding: "理解灵感",
@@ -115,6 +132,18 @@ const inspirationChips = [
   "刘三姐山歌变成了魔法地图"
 ];
 
+function getAppRoute(): AppRoute {
+  const playMatch = window.location.hash.match(/^#\/play\/([^/?#]+)/u);
+  if (playMatch?.[1]) {
+    return { mode: "player", bookId: decodeURIComponent(playMatch[1]) };
+  }
+  return { mode: "studio" };
+}
+
+function getPlayerHref(bookId: string) {
+  return `#/play/${encodeURIComponent(bookId)}`;
+}
+
 function getBrowserVoices(): Promise<SpeechSynthesisVoice[]> {
   return new Promise((resolve) => {
     const voices = window.speechSynthesis.getVoices();
@@ -128,7 +157,17 @@ function getBrowserVoices(): Promise<SpeechSynthesisVoice[]> {
   });
 }
 
-function pickWarmChineseVoice(voices: SpeechSynthesisVoice[]) {
+function pickWarmVoice(voices: SpeechSynthesisVoice[], language: BookLanguage) {
+  if (language === "en") {
+    const englishVoices = voices.filter((voice) => /^en/i.test(voice.lang) || /English/u.test(voice.name));
+    return (
+      englishVoices.find((voice) => /Samantha|Ava|Jenny|Aria|Google US English|English/u.test(voice.name)) ||
+      englishVoices.find((voice) => voice.localService) ||
+      englishVoices[0] ||
+      null
+    );
+  }
+
   const chineseVoices = voices.filter((voice) => /^zh/i.test(voice.lang) || /Chinese|Mandarin|普通话|中文/u.test(voice.name));
   return (
     chineseVoices.find((voice) => /Xiaoxiao|Xiaoyi|Tingting|Meijia|普通话|Mandarin/u.test(voice.name)) ||
@@ -141,27 +180,28 @@ function pickWarmChineseVoice(voices: SpeechSynthesisVoice[]) {
 function splitSpeechText(text: string) {
   return text
     .replace(/\s+/gu, " ")
-    .split(/(?<=[。！？!?])/u)
+    .split(/(?<=[。！？!?])|(?<=\.)\s+/u)
     .map((part) => part.trim())
     .filter(Boolean);
 }
 
-async function speakWithBrowser(text: string) {
+async function speakWithBrowser(text: string, language: BookLanguage = "zh") {
   if (!window.speechSynthesis) {
     return;
   }
 
   window.speechSynthesis.cancel();
-  const voice = pickWarmChineseVoice(await getBrowserVoices());
-  for (const [index, chunk] of splitSpeechText(text).entries()) {
+  const voice = pickWarmVoice(await getBrowserVoices(), language);
+  const chunks = splitSpeechText(text);
+  for (const [index, chunk] of chunks.entries()) {
     const utterance = new SpeechSynthesisUtterance(chunk);
-    utterance.lang = voice?.lang || "zh-CN";
+    utterance.lang = voice?.lang || (language === "en" ? "en-US" : "zh-CN");
     utterance.voice = voice;
     utterance.rate = 1.12;
     utterance.pitch = 1.03;
     window.speechSynthesis.speak(utterance);
     await new Promise<void>((resolve) => {
-      utterance.onend = () => window.setTimeout(resolve, index < splitSpeechText(text).length - 1 ? 80 : 0);
+      utterance.onend = () => window.setTimeout(resolve, index < chunks.length - 1 ? 80 : 0);
       utterance.onerror = () => resolve();
     });
   }
@@ -174,6 +214,37 @@ function formatDate(value: string) {
     hour: "2-digit",
     minute: "2-digit"
   }).format(new Date(value));
+}
+
+function cleanSpeechPart(text: string) {
+  return text
+    .replace(/第\s*\d+\s*页[，,：:\s]*/gu, "")
+    .replace(/[·•]/gu, " ")
+    .replace(/\s+/gu, " ")
+    .trim()
+    .replace(/[。！？!?.,，、；;：:]+$/gu, "");
+}
+
+function buildReadText(book: PictureBook) {
+  const language = book.language || "zh";
+  const parts = [book.title, ...book.pages.map((page) => page.text), book.tourGuideScript]
+    .map(cleanSpeechPart)
+    .filter(Boolean);
+  if (!parts.length) {
+    return "";
+  }
+
+  const separator = language === "en" ? ". " : "。";
+  const endMark = language === "en" ? "." : "。";
+  return `${parts.join(separator)}${endMark}`;
+}
+
+function buildPageReadText(book: PictureBook, page: PictureBookPage) {
+  const language = book.language || "zh";
+  const parts = [page.title, page.text, page.cultureNote].map(cleanSpeechPart).filter(Boolean);
+  const separator = language === "en" ? ". " : "。";
+  const endMark = language === "en" ? "." : "。";
+  return `${parts.join(separator)}${endMark}`;
 }
 
 function mergePictureBook(current: PictureBook | null, incoming: PictureBook) {
@@ -211,6 +282,7 @@ function makeProgress(stage: ProgressStage, title: string, detail: string, image
 }
 
 export default function App() {
+  const [route, setRoute] = useState<AppRoute>(() => getAppRoute());
   const [idea, setIdea] = useState("我想写一个小朋友在三月三歌圩上遇到会唱山歌的绣球。");
   const [books, setBooks] = useState<PictureBookSummary[]>([]);
   const [activeBook, setActiveBook] = useState<PictureBook | null>(null);
@@ -218,11 +290,18 @@ export default function App() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [shouldGenerateImage, setShouldGenerateImage] = useState(true);
+  const [bookLanguage, setBookLanguage] = useState<BookLanguage>("zh");
   const [activeTab, setActiveTab] = useState<"book" | "prompts">("book");
   const [bailianStatus, setBailianStatus] = useState<BailianStatus | null>(null);
   const [generationProgress, setGenerationProgress] = useState<GenerationProgress | null>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const speechSupported = Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
+
+  useEffect(() => {
+    const handleHashChange = () => setRoute(getAppRoute());
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, []);
 
   useEffect(() => {
     void refreshBooks();
@@ -231,6 +310,16 @@ export default function App() {
       .then((data: BailianStatus) => setBailianStatus(data))
       .catch(() => setBailianStatus(null));
   }, []);
+
+  useEffect(() => {
+    if (route.mode !== "player" || activeBook?.id === route.bookId) {
+      return;
+    }
+    void loadBook(route.bookId, { silent: true }).catch((error) => {
+      const message = error instanceof Error ? error.message : "正式播放页打开失败";
+      setNotice(message);
+    });
+  }, [activeBook?.id, route]);
 
   useEffect(() => {
     if (!generationProgress?.active) {
@@ -259,16 +348,23 @@ export default function App() {
     return data.books || [];
   }
 
-  async function openBook(id: string) {
+  async function loadBook(id: string, options?: { silent?: boolean }) {
     const response = await fetch(`/api/picture-books/${encodeURIComponent(id)}`);
     const data = (await response.json()) as { book?: PictureBook; error?: string };
     if (!response.ok || !data.book) {
       throw new Error(data.error || "作品不存在");
     }
     setActiveBook(data.book);
+    if (!options?.silent) {
+      setNotice("已打开作品，可以继续生成插图或查看 Prompt 记录");
+    }
+    return data.book;
+  }
+
+  async function openBook(id: string) {
+    await loadBook(id);
     setActiveTab("book");
     setGenerationProgress(null);
-    setNotice("已打开作品，可以继续生成插图或查看 Prompt 记录");
   }
 
   async function generateBook(event?: FormEvent<HTMLFormElement>) {
@@ -299,7 +395,7 @@ export default function App() {
       const response = await fetch("/api/picture-books/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idea: cleanIdea, generateImage: false })
+        body: JSON.stringify({ idea: cleanIdea, language: bookLanguage, generateImage: false })
       });
       const data = (await response.json()) as { book?: PictureBook; books?: PictureBookSummary[]; error?: string };
       if (!response.ok || !data.book) {
@@ -536,9 +632,11 @@ export default function App() {
     setNotice("已停止语音输入，可以点击生成绘本");
   }
 
-  const readText = activeBook
-    ? [activeBook.title, ...activeBook.pages.map((page) => `第${page.pageNumber}页，${page.text}`), activeBook.tourGuideScript].join("。")
-    : "";
+  const readText = activeBook ? buildReadText(activeBook) : "";
+
+  if (route.mode === "player") {
+    return <PictureBookPlayer book={activeBook?.id === route.bookId ? activeBook : null} />;
+  }
 
   return (
     <main className="app-shell">
@@ -578,6 +676,27 @@ export default function App() {
               disabled={isGenerating}
               placeholder="说一句：我想写一个小朋友在三月三歌圩上遇到会唱山歌的绣球。"
             />
+            <div className="language-switch" aria-label="绘本语言">
+              <span>绘本语言</span>
+              <div>
+                <button
+                  type="button"
+                  className={bookLanguage === "zh" ? "active" : ""}
+                  onClick={() => setBookLanguage("zh")}
+                  disabled={isGenerating}
+                >
+                  中文
+                </button>
+                <button
+                  type="button"
+                  className={bookLanguage === "en" ? "active" : ""}
+                  onClick={() => setBookLanguage("en")}
+                  disabled={isGenerating}
+                >
+                  English
+                </button>
+              </div>
+            </div>
             <div className="composer-actions">
               <button
                 className={`round-button ${isListening ? "active" : ""}`}
@@ -667,10 +786,16 @@ export default function App() {
               <h2>{activeBook?.title || "创编工作台"}</h2>
             </div>
             <div className="topbar-actions">
-              <button className="secondary-button" type="button" onClick={() => void speakWithBrowser(readText)} disabled={!activeBook}>
+              <button className="secondary-button" type="button" onClick={() => void speakWithBrowser(readText, activeBook?.language || "zh")} disabled={!activeBook}>
                 <Volume2 size={18} />
                 朗读绘本
               </button>
+              {activeBook ? (
+                <a className="secondary-button" href={getPlayerHref(activeBook.id)} target="_blank" rel="noreferrer">
+                  <ExternalLink size={18} />
+                  正式播放
+                </a>
+              ) : null}
               <button className="secondary-button" type="button" onClick={() => setActiveTab(activeTab === "book" ? "prompts" : "book")} disabled={!activeBook}>
                 <FileText size={18} />
                 {activeTab === "book" ? "Prompt 记录" : "返回绘本"}
@@ -685,6 +810,9 @@ export default function App() {
 
           <div className="workbench-body">
             {generationProgress ? <GenerationProgressPanel progress={generationProgress} /> : null}
+            {generationProgress && activeBook && !generationProgress.active ? (
+              <PostGenerateActions book={activeBook} onDismiss={() => setGenerationProgress(null)} />
+            ) : null}
             {activeBook ? (
               activeTab === "book" ? (
                 <BookView book={activeBook} onGenerateImage={generatePageImage} imageTasks={generationProgress?.imageTasks} />
@@ -782,6 +910,24 @@ function getImageSourceLabel(page: PictureBookPage, taskStatus: ImageTaskStatus)
   return page.imageSource === "bailian" ? "百炼图片" : "演示插图";
 }
 
+function getCulturePanelCopy(language: BookLanguage) {
+  if (language === "en") {
+    return {
+      title: "Culture Mini-Guide",
+      subtitle: "The encyclopedia notes used for reading aloud and presentation",
+      guideLabel: "Student Guide Script",
+      noteLabel: "Page Notes"
+    };
+  }
+
+  return {
+    title: "广西文化小百科",
+    subtitle: "朗读和展示都会用到的非遗文旅介绍",
+    guideLabel: "小小文旅讲解词",
+    noteLabel: "每页小知识"
+  };
+}
+
 function GenerationProgressPanel({ progress }: { progress: GenerationProgress }) {
   const percent = getProgressPercent(progress);
 
@@ -830,6 +976,143 @@ function GenerationProgressPanel({ progress }: { progress: GenerationProgress })
   );
 }
 
+function PostGenerateActions({ book, onDismiss }: { book: PictureBook; onDismiss: () => void }) {
+  return (
+    <section className="post-generate-actions">
+      <div>
+        <p className="eyebrow">故事已生成</p>
+        <h3>可以继续编辑，也可以进入正式播放页</h3>
+        <p>正式播放会打开一个专门用于展示绘本的大屏链接，适合比赛现场讲故事。</p>
+      </div>
+      <div>
+        <button className="secondary-button" type="button" onClick={onDismiss}>
+          <BookOpen size={18} />
+          查看该故事
+        </button>
+        <a className="primary-button" href={getPlayerHref(book.id)} target="_blank" rel="noreferrer">
+          <ExternalLink size={18} />
+          正式播放绘本
+        </a>
+      </div>
+    </section>
+  );
+}
+
+function PictureBookPlayer({ book }: { book: PictureBook | null }) {
+  const [pageIndex, setPageIndex] = useState(0);
+
+  useEffect(() => {
+    setPageIndex(0);
+  }, [book?.id]);
+
+  if (!book) {
+    return (
+      <main className="player-shell">
+        <section className="player-loading">
+          <LoaderCircle className="loading-spinner" size={34} />
+          <h1>正在打开正式播放页</h1>
+          <p>如果作品刚刚生成完成，请稍等片刻。</p>
+          <a className="secondary-button" href="#/">
+            <Home size={18} />
+            返回创编工作台
+          </a>
+        </section>
+      </main>
+    );
+  }
+
+  const language = book.language || "zh";
+  const pages = book.pages.length ? book.pages : [];
+  const page = pages[Math.min(pageIndex, Math.max(pages.length - 1, 0))];
+  const pageCount = pages.length;
+  const currentPageNumber = page ? pageIndex + 1 : 0;
+
+  return (
+    <main className="player-shell">
+      <header className="player-header">
+        <a className="secondary-button" href="#/">
+          <Home size={18} />
+          返回工作台
+        </a>
+        <div>
+          <p className="eyebrow">正式播放绘本</p>
+          <h1>{book.title}</h1>
+          <p>{book.subtitle}</p>
+        </div>
+        <button className="secondary-button" type="button" onClick={() => void speakWithBrowser(buildReadText(book), language)}>
+          <Volume2 size={18} />
+          朗读全书
+        </button>
+      </header>
+
+      {page ? (
+        <section className="player-stage">
+          <div className="player-image">
+            {page.imageUrl ? (
+              <img src={page.imageUrl} alt={`${book.title} ${page.title}`} />
+            ) : (
+              <div className="player-image-empty">
+                <Image size={46} />
+                <span>这页插图还在等待生成</span>
+              </div>
+            )}
+          </div>
+          <article className="player-copy">
+            <p className="eyebrow">
+              {language === "en" ? `Page ${currentPageNumber} / ${pageCount}` : `第 ${currentPageNumber} / ${pageCount} 页`}
+            </p>
+            <h2>{page.title}</h2>
+            <p>{page.text}</p>
+            <div className="player-culture-note">
+              <strong>{language === "en" ? "Culture Mini-Guide" : "文化小百科"}</strong>
+              <span>{page.cultureNote}</span>
+            </div>
+            <div className="player-controls">
+              <button className="secondary-button" type="button" onClick={() => setPageIndex((current) => Math.max(0, current - 1))} disabled={pageIndex === 0}>
+                <ChevronLeft size={18} />
+                上一页
+              </button>
+              <button className="secondary-button" type="button" onClick={() => void speakWithBrowser(buildPageReadText(book, page), language)}>
+                <Volume2 size={18} />
+                朗读本页
+              </button>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => setPageIndex((current) => Math.min(pageCount - 1, current + 1))}
+                disabled={pageIndex >= pageCount - 1}
+              >
+                下一页
+                <ChevronRight size={18} />
+              </button>
+            </div>
+          </article>
+        </section>
+      ) : (
+        <section className="player-loading">
+          <Paintbrush size={38} />
+          <h1>这本绘本还没有页面</h1>
+          <p>请回到工作台重新生成故事。</p>
+        </section>
+      )}
+
+      <nav className="player-page-dots" aria-label="播放页码">
+        {pages.map((item, index) => (
+          <button
+            type="button"
+            className={index === pageIndex ? "active" : ""}
+            key={item.pageNumber}
+            onClick={() => setPageIndex(index)}
+            aria-label={language === "en" ? `Go to page ${index + 1}` : `跳到第 ${index + 1} 页`}
+          >
+            {index + 1}
+          </button>
+        ))}
+      </nav>
+    </main>
+  );
+}
+
 function BookView({
   book,
   onGenerateImage,
@@ -839,6 +1122,12 @@ function BookView({
   onGenerateImage: (pageNumber: number) => Promise<void>;
   imageTasks?: Record<number, ImageTaskStatus>;
 }) {
+  const language = book.language || "zh";
+  const cultureCopy = getCulturePanelCopy(language);
+  const cultureNotes = book.pages
+    .map((page) => ({ pageNumber: page.pageNumber, text: page.cultureNote.trim() }))
+    .filter((item) => item.text);
+
   return (
     <div className="book-view">
       <section className="book-hero">
@@ -858,6 +1147,10 @@ function BookView({
               {item}
             </span>
           ))}
+          <a className="player-inline-link" href={getPlayerHref(book.id)} target="_blank" rel="noreferrer">
+            <ExternalLink size={15} />
+            正式播放
+          </a>
         </div>
       </section>
 
@@ -878,6 +1171,30 @@ function BookView({
           <h3>小小文旅推荐官</h3>
           <p>{book.tourGuideScript}</p>
         </article>
+      </section>
+
+      <section className="culture-panel">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">{cultureCopy.subtitle}</p>
+            <h3>{cultureCopy.title}</h3>
+          </div>
+        </div>
+        <article className="culture-guide-card">
+          <strong>{cultureCopy.guideLabel}</strong>
+          <p>{book.tourGuideScript}</p>
+        </article>
+        {cultureNotes.length ? (
+          <div className="culture-note-list">
+            <strong>{cultureCopy.noteLabel}</strong>
+            {cultureNotes.map((item) => (
+              <p key={item.pageNumber}>
+                <span>{language === "en" ? `Page ${item.pageNumber}` : `第 ${item.pageNumber} 页`}</span>
+                {item.text}
+              </p>
+            ))}
+          </div>
+        ) : null}
       </section>
 
       <section className="page-grid">

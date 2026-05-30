@@ -2,6 +2,7 @@ import {
   makeBookId,
   makePromptRecord,
   nowIso,
+  type BookLanguage,
   type PictureBook,
   type PictureBookPage
 } from "./bookStore.js";
@@ -34,7 +35,18 @@ function pickElements(idea: string, candidates: string[], count: number) {
   return merged.slice(0, count);
 }
 
-function makeIllustrationPrompt(pageTitle: string, pageText: string, heritage: string[], tourism: string[]) {
+function makeIllustrationPrompt(pageTitle: string, pageText: string, heritage: string[], tourism: string[], language: BookLanguage) {
+  if (language === "en") {
+    return [
+      "Warm and bright children's picture book illustration, watercolor texture, one elementary-school protagonist, suitable for ages 6-12.",
+      `Page theme: ${pageTitle}.`,
+      `Story scene: ${pageText}`,
+      `Guangxi intangible heritage elements: ${heritage.join(", ")}.`,
+      `Guangxi cultural tourism elements: ${tourism.join(", ")}.`,
+      "Layered composition, friendly expressions, Guangxi ethnic patterns, landscape and festival atmosphere, no text, no watermark, no real-person portrait."
+    ].join("\n");
+  }
+
   return [
     "儿童绘本插图，温暖明亮的水彩风格，小学生主角，画面适合 6-12 岁儿童。",
     `页面主题：${pageTitle}。`,
@@ -45,11 +57,61 @@ function makeIllustrationPrompt(pageTitle: string, pageText: string, heritage: s
   ].join("\n");
 }
 
-export function createFallbackBook(idea: string): PictureBook {
+export function createFallbackBook(idea: string, language: BookLanguage = "zh"): PictureBook {
   const id = makeBookId();
   const timestamp = nowIso();
   const heritage = pickElements(idea, heritageElements, 3);
   const tourism = pickElements(idea, tourismElements, 2);
+  if (language === "en") {
+    const title = idea.includes("德天瀑布")
+      ? "The Singing Embroidered Ball by Detian Waterfall"
+      : idea.includes("桂林")
+        ? "The Glowing Zhuang Brocade Goes to Guilin"
+        : "The Embroidered Ball That Sang Mountain Songs";
+    const pageTexts = [
+      `I shared my idea with Gui Xiaoling, and ${heritage[0]} suddenly began to glow like a tiny doorway into a Guangxi story.`,
+      `We arrived at ${tourism[0]}, where the wind carried mountain songs and the colors of ${heritage[1]} across the path.`,
+      `On the road, I met a friend who wanted to know Guangxi better. With AI's help, I introduced ${heritage[0]} and ${heritage[2]} in my own words.`,
+      `At the end, I turned the journey into a picture book and shared ${tourism[1]} and ${heritage.join(", ")} with more classmates.`
+    ];
+    const titles = ["A Bright Idea", "Into Guangxi", "Little Culture Guide", "My Picture Book"];
+    const pages: PictureBookPage[] = pageTexts.map((text, index) => ({
+      pageNumber: index + 1,
+      title: titles[index],
+      text,
+      imagePrompt: makeIllustrationPrompt(titles[index], text, heritage, tourism, language),
+      imageUrl: "",
+      imageSource: "placeholder",
+      cultureNote: `${heritage[index % heritage.length]} is a Guangxi cultural element. It can become a story character, clue, or visual symbol.`
+    }));
+    const storyPrompt = `Turn the student's idea "${idea}" into a 4-page Guangxi intangible heritage and cultural tourism picture book in English.`;
+
+    return {
+      id,
+      title,
+      subtitle: "An AI picture book where travel and heritage shine together",
+      originalIdea: idea,
+      language,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      heritageElements: heritage,
+      tourismElements: tourism,
+      guidingQuestions: [
+        "Is the heritage element a friend, a clue, or a magical object in my story?",
+        "Which Guangxi place or culture do I want classmates to remember after reading?"
+      ],
+      outline: `The main character starts from one idea, travels through ${tourism.join(" and ")}, learns about ${heritage.join(", ")}, and finishes an original Guangxi picture book.`,
+      pages,
+      tourGuideScript: `Hello, I am a little cultural tourism guide. Today I want to introduce ${tourism.join(" and ")}. I also want to share Guangxi cultural elements such as ${heritage.join(", ")}. Welcome to Guangxi, and turn your travel discoveries into your own stories.`,
+      studentReflection: "I shared an idea, asked questions with AI, made choices, and turned Guangxi culture into my own original picture book.",
+      aiContentRatio: 88,
+      promptRecords: [
+        makePromptRecord("story", "Story Generation Prompt", storyPrompt, "Generated a 4-page picture book, outline, guide script, and heritage notes."),
+        ...pages.map((page) => makePromptRecord("image", `Page ${page.pageNumber} Image Prompt`, page.imagePrompt, "Waiting for image generation or using a local demo illustration."))
+      ]
+    };
+  }
+
   const title = idea.includes("德天瀑布")
     ? "瀑布边的会唱歌绣球"
     : idea.includes("桂林")
@@ -67,7 +129,7 @@ export function createFallbackBook(idea: string): PictureBook {
     pageNumber: index + 1,
     title: ["灵感发光", "走进广西", "小小讲解员", "我的创编绘本"][index],
     text,
-    imagePrompt: makeIllustrationPrompt(["灵感发光", "走进广西", "小小讲解员", "我的创编绘本"][index], text, heritage, tourism),
+    imagePrompt: makeIllustrationPrompt(["灵感发光", "走进广西", "小小讲解员", "我的创编绘本"][index], text, heritage, tourism, language),
     imageUrl: "",
     imageSource: "placeholder",
     cultureNote: `${heritage[index % heritage.length]}是广西文化元素，可以被创编成故事角色、线索或画面符号。`
@@ -80,6 +142,7 @@ export function createFallbackBook(idea: string): PictureBook {
     title,
     subtitle: "一本文旅和非遗一起发光的 AI 绘本",
     originalIdea: idea,
+    language,
     createdAt: timestamp,
     updatedAt: timestamp,
     heritageElements: heritage,
