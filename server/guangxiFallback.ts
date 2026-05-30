@@ -60,6 +60,7 @@ const tourismCatalog: SceneOption[] = [
   { name: "龙脊梯田", keywords: ["龙脊", "梯田", "稻田", "terrace"] },
   { name: "河池东兰铜鼓文化景区", keywords: ["铜鼓", "东兰", "河池", "鼓声"] },
   { name: "南宁青秀山", keywords: ["南宁", "青秀山", "绿城", "三月三", "歌圩", "绣球", "山歌"] },
+  { name: "南宁动物园", keywords: ["南宁动物园", "动物园", "小熊猫", "动物", "zoo", "red panda"] },
   { name: "南宁三街两巷", keywords: ["三街两巷", "南宁", "老街", "骑楼", "三月三", "歌圩"] },
   { name: "黄姚古镇", keywords: ["黄姚", "古镇", "贺州"] },
   { name: "柳州百里柳江", keywords: ["柳州", "柳江", "窑埠", "螺蛳粉"] },
@@ -96,6 +97,7 @@ const cultureNotes: Record<string, string> = {
   百色芒果园自然观察: "百色芒果园能观察果树、花香、昆虫和采摘劳动，是认识地方物产和自然节律的好场景。",
   百色右江河谷田园生活: "右江河谷有温暖气候、田园风光和果园生活，能让孩子从身边风景理解家乡特色。",
   柳州柳江城市风景: "柳江穿城而过，桥梁、夜景和市井生活能展现柳州活泼的城市气质。",
+  南宁动物园动物观察: "南宁动物园里的动物观察适合写儿童亲近自然、学习保护动物和记录发现的故事。",
   南宁老街城市记忆: "老街里的骑楼、店铺和街巷故事，适合表现城市记忆与日常生活。",
   北海银滩海洋观察: "银滩的浪花、贝壳、海风和潮汐，适合写儿童观察自然和保护海洋的故事。",
   三娘湾中华白海豚生态观察: "三娘湾常被人们和中华白海豚联系在一起，适合写海洋观察、保护海湾和亲近自然的旅行故事。",
@@ -106,6 +108,130 @@ const cultureNotes: Record<string, string> = {
   壮锦织造技艺: "壮锦织造技艺图案鲜明、色彩丰富，适合织布、纹样和家传手艺故事。",
   铜鼓习俗: "铜鼓习俗和节庆、仪式、鼓声有关，适合真正出现鼓声或铜鼓线索的故事。"
 };
+
+const englishNameMap: Record<string, string> = {
+  桂小灵: "Gui Xiaoling",
+  "是广西文化元素，适合和相关地点、人物或行动自然连在一起。": " is a Guangxi local highlight. Use it when it naturally connects with the place, characters, or action.",
+  "是广西文化元素": " is a Guangxi local highlight",
+  广西: "Guangxi",
+  壮族绣球: "Zhuang embroidered ball",
+  壮族山歌: "Zhuang mountain songs",
+  刘三姐歌谣: "Liu Sanjie ballads",
+  壮族三月三: "Zhuang Sanyuesan Festival",
+  五色糯米饭: "five-color sticky rice",
+  北海贝雕: "Beihai shell carving",
+  合浦南珠制作技艺: "Hepu pearl craft",
+  疍家渔歌: "Tanka fishing songs",
+  三娘湾中华白海豚生态观察: "Sanniang Bay Chinese white dolphin ecology",
+  钦州海边赶海生活: "Qinzhou tide-pool gathering life",
+  侗族大歌: "Dong grand song",
+  侗族木构建筑营造技艺: "Dong wooden architecture",
+  侗族刺绣: "Dong embroidery",
+  瑶族盘王节: "Yao Panwang Festival",
+  毛南族花竹帽编织技艺: "Maonan flower bamboo-hat weaving",
+  天琴弹唱: "Tianqin singing",
+  花山岩画: "Huashan rock paintings",
+  柳州螺蛳粉制作技艺: "Liuzhou luosifen-making craft",
+  广西彩调: "Guangxi Caidiao opera",
+  融水苗族芦笙斗马节: "Rongshui Miao lusheng and horse-fighting festival",
+  桂林米粉制作技艺: "Guilin rice noodle craft",
+  龙脊梯田农耕文化: "Longji Terrace farming culture",
+  瑶族服饰: "Yao clothing",
+  百色芒果种植文化: "Baise mango-growing culture",
+  右江壮族农耕生活: "Youjiang Zhuang farming life",
+  钦州坭兴陶烧制技艺: "Qinzhou Nixing pottery firing craft",
+  壮锦织造技艺: "Zhuang brocade weaving",
+  铜鼓习俗: "bronze drum customs",
+  桂林山水: "Guilin karst landscape",
+  阳朔漓江: "Yangshuo Li River",
+  德天跨国瀑布: "Detian Transnational Waterfall",
+  崇左明仕田园: "Chongzuo Mingshi Countryside",
+  北海银滩: "Beihai Silver Beach",
+  合浦海丝首港: "Hepu Maritime Silk Road First Port",
+  钦州三娘湾: "Qinzhou Sanniang Bay",
+  钦州茅尾海: "Qinzhou Maowei Sea",
+  三江程阳风雨桥: "Sanjiang Chengyang Wind-Rain Bridge",
+  三江鼓楼侗寨: "Sanjiang drum-tower Dong village",
+  龙脊梯田: "Longji Terraces",
+  河池东兰铜鼓文化景区: "Hechi Donglan Bronze Drum Cultural Area",
+  南宁青秀山: "Nanning Qingxiu Mountain",
+  南宁动物园: "Nanning Zoo",
+  南宁三街两巷: "Nanning Three Streets and Two Alleys",
+  黄姚古镇: "Huangyao Ancient Town",
+  柳州百里柳江: "Liuzhou Baili Liujiang scenic belt",
+  柳州窑埠古镇: "Liuzhou Yaobu Ancient Town",
+  百色芒果园: "Baise mango orchards",
+  百色右江河谷: "Baise Youjiang River Valley",
+  崇左花山岩画景区: "Chongzuo Huashan Rock Painting Scenic Area",
+  桂林山水自然观察: "Guilin landscape nature observation",
+  漓江山水与竹筏生活: "Li River scenery and bamboo-raft life",
+  德天瀑布边境山水: "Detian Waterfall border landscape",
+  明仕田园喀斯特风光: "Mingshi Countryside karst landscape",
+  北海银滩海洋观察: "Beihai Silver Beach marine observation",
+  合浦海丝港口故事: "Hepu Maritime Silk Road port stories",
+  钦州三娘湾海洋观察: "Qinzhou Sanniang Bay marine observation",
+  钦州茅尾海渔家生活: "Qinzhou Maowei Sea fishing-family life",
+  三江风雨桥建筑观察: "Sanjiang Wind-Rain Bridge architecture",
+  三江侗寨生活观察: "Sanjiang Dong village daily life",
+  龙脊梯田农耕风景: "Longji Terrace farming landscape",
+  河池山乡节庆观察: "Hechi mountain-village festival observation",
+  南宁青秀山自然观察: "Nanning Qingxiu Mountain nature observation",
+  南宁动物园动物观察: "Nanning Zoo animal observation",
+  南宁老街城市记忆: "Nanning old-street city memories",
+  黄姚古镇生活美学: "Huangyao Ancient Town everyday aesthetics",
+  柳州柳江城市风景: "Liuzhou Liujiang city scenery",
+  柳州窑埠夜市生活: "Liuzhou Yaobu night-market life",
+  百色芒果园自然观察: "Baise mango-orchard nature observation",
+  百色右江河谷田园生活: "Baise Youjiang River Valley rural life",
+  崇左左江山水观察: "Chongzuo Zuojiang landscape observation",
+  小熊猫: "red panda",
+  壮语童谣: "Zhuang nursery rhyme"
+};
+
+const englishCultureNotes: Record<string, string> = {
+  壮族绣球: "Zhuang embroidered balls often appear in festivals and song fairs. They can become a blessing token or a playful story clue.",
+  壮族山歌: "Zhuang mountain songs are often sung in daily life, festivals, and work scenes, making them a natural sound clue in a story.",
+  刘三姐歌谣: "Liu Sanjie ballads are closely connected with Guilin scenery and Zhuang singing traditions.",
+  壮族三月三: "Zhuang Sanyuesan is an important Guangxi festival with song fairs, mountain songs, and festive foods.",
+  五色糯米饭: "Five-color sticky rice is a Guangxi festival food colored with natural plants and often linked with Sanyuesan.",
+  北海贝雕: "Beihai shell carving uses the natural shine of shells, so it fits beach, Silver Beach, and treasure-hunt stories.",
+  合浦南珠制作技艺: "Hepu pearls are known for their gentle luster and connect naturally with Beihai and Hepu's maritime culture.",
+  疍家渔歌: "Tanka fishing songs come from life on the water and fit scenes with boats, sea wind, and fishing work.",
+  三娘湾中华白海豚生态观察: "Sanniang Bay is often associated with Chinese white dolphins, making it a good scene for marine observation and bay protection.",
+  钦州海边赶海生活: "Qinzhou tide-pool gathering life includes crab holes, tides, shells, boats, and sea wind.",
+  侗族大歌: "Dong grand song is a multi-part folk singing tradition often heard around Sanjiang Dong villages, drum towers, and wind-rain bridges.",
+  侗族木构建筑营造技艺: "Dong wind-rain bridges and drum towers show wooden building wisdom through interlocking structures.",
+  侗族刺绣: "Dong embroidery appears on clothing and daily objects, adding careful handmade detail to Sanjiang village scenes.",
+  瑶族盘王节: "The Yao Panwang Festival carries song, dance, ritual, and community memory.",
+  毛南族花竹帽编织技艺: "Maonan flower bamboo hats are light and delicate, with patterns and weaving steps that suit close-up story details.",
+  天琴弹唱: "Tianqin singing has a bright, clear sound and fits waterfall, border, mountain, and night scenes in southwest Guangxi.",
+  花山岩画: "Huashan rock paintings along the Zuojiang River record ancient images of ritual and daily imagination.",
+  柳州螺蛳粉制作技艺: "Liuzhou luosifen-making brings together rice noodles, soup, and sour bamboo shoots, fitting food-travel stories.",
+  桂林米粉制作技艺: "Guilin rice noodles are a daily city flavor that can naturally enter a Guangxi picture book.",
+  龙脊梯田农耕文化: "Longji Terrace farming culture shows mountain farming wisdom and fits rice-field, planting, and harvest scenes.",
+  百色芒果园自然观察: "Baise mango orchards let children observe fruit trees, flowers, insects, and harvest work.",
+  南宁动物园动物观察: "Nanning Zoo animal observation fits stories about meeting animals, recording discoveries, and learning to protect nature.",
+  南宁老街城市记忆: "Nanning old streets, arcades, shops, and lane stories are good for showing city memory and daily life.",
+  南宁青秀山自然观察: "Qingxiu Mountain in Nanning fits nature observation, green city scenery, plants, paths, and class-trip discoveries.",
+  钦州三娘湾海洋观察: "Sanniang Bay has sea wind, beaches, boats, and dolphin stories, making it a good place to learn about marine ecology."
+};
+
+export function localizeGuangxiName(name: string, language: BookLanguage = "zh") {
+  if (language !== "en") {
+    return name;
+  }
+  return englishNameMap[name] || name;
+}
+
+export function localizeGuangxiText(value: string, language: BookLanguage = "zh") {
+  if (language !== "en" || !value) {
+    return value;
+  }
+
+  return Object.entries(englishNameMap)
+    .sort((left, right) => right[0].length - left[0].length)
+    .reduce((text, [source, target]) => text.split(source).join(target), value);
+}
 
 function ideaIncludesAny(idea: string, keywords: string[]) {
   const normalizedIdea = idea.toLowerCase();
@@ -149,6 +275,7 @@ function tourismCultureLabel(name: string) {
     龙脊梯田: "龙脊梯田农耕风景",
     河池东兰铜鼓文化景区: "河池山乡节庆观察",
     南宁青秀山: "南宁青秀山自然观察",
+    南宁动物园: "南宁动物园动物观察",
     南宁三街两巷: "南宁老街城市记忆",
     黄姚古镇: "黄姚古镇生活美学",
     柳州百里柳江: "柳州柳江城市风景",
@@ -195,11 +322,13 @@ export function buildSceneFirstHeritageGuide(idea: string, language: BookLanguag
   const heritage = chooseHeritageElements(idea, 4);
   const tourism = chooseTourismElements(idea, 3);
   if (language === "en") {
+    const displayHeritage = heritage.map((item) => localizeGuangxiName(item, language));
+    const displayTourism = tourism.map((item) => localizeGuangxiName(item, language));
     return [
       "Scene-first culture rule: choose Guangxi heritage elements only when they naturally fit. If no heritage element fits, introduce meaningful local highlights such as landscape, food, farming, city memory, architecture, ecology, or daily life.",
       "Do not use Zhuang brocade or bronze drum as default Guangxi symbols. Use them only when the idea mentions brocade, weaving, patterns, bronze drums, drum sounds, or a clearly related custom.",
       "Examples: Beihai/Silver Beach/sea -> Beihai shell carving, Hepu pearls, Tanka fishing songs; Sanyuesan/song fair/mountain songs/embroidered ball -> Zhuang Sanyuesan, Zhuang mountain songs, Zhuang embroidered ball, five-color sticky rice; Sanjiang/wind-rain bridge -> Dong grand song and Dong wooden architecture; Liuzhou/food -> Luosifen making craft; Guilin/Lijiang/Liu Sanjie -> Liu Sanjie ballads and Guilin rice noodles.",
-      `For this idea, prefer culture highlights such as: ${heritage.join(", ")}. Prefer travel scenes such as: ${tourism.join(", ")}.`
+      `For this idea, prefer culture highlights such as: ${displayHeritage.join(", ")}. Prefer travel scenes such as: ${displayTourism.join(", ")}.`
     ].join("\n");
   }
 
@@ -273,7 +402,8 @@ function makeIllustrationPrompt(
 function getCultureNote(name: string, language: BookLanguage) {
   const note = cultureNotes[name] || `${name}是广西文化元素，适合和相关地点、人物或行动自然连在一起。`;
   if (language === "en") {
-    return `${name} is a Guangxi cultural element. Use it when it fits the place, action, and mood of the story.`;
+    const localizedName = localizeGuangxiName(name, language);
+    return englishCultureNotes[name] || `${localizedName} is a Guangxi local highlight. Use it when it fits the place, action, and mood of the story.`;
   }
   return note;
 }
@@ -382,8 +512,10 @@ function makeChineseFallbackPages(
 export function createFallbackBook(idea: string, language: BookLanguage = "zh", protagonistGender: ProtagonistGender = "girl"): PictureBook {
   const id = makeBookId();
   const timestamp = nowIso();
-  const heritage = chooseHeritageElements(idea, 3);
-  const tourism = chooseTourismElements(idea, 2);
+  const selectedHeritage = chooseHeritageElements(idea, 3);
+  const selectedTourism = chooseTourismElements(idea, 2);
+  const heritage = selectedHeritage.map((item) => localizeGuangxiName(item, language));
+  const tourism = selectedTourism.map((item) => localizeGuangxiName(item, language));
   if (language === "en") {
     const title = makeFallbackTitle(idea, language);
     const pageTexts = [
@@ -400,7 +532,7 @@ export function createFallbackBook(idea: string, language: BookLanguage = "zh", 
       imagePrompt: makeIllustrationPrompt(titles[index], text, heritage, tourism, language, protagonistGender),
       imageUrl: "",
       imageSource: "placeholder",
-      cultureNote: getCultureNote(heritage[index % heritage.length], language)
+      cultureNote: getCultureNote(selectedHeritage[index % selectedHeritage.length], language)
     }));
     const storyPrompt = `Turn the student's idea "${idea}" into a 4-page Guangxi culture and travel picture book in English. Use heritage only when it naturally fits.`;
 
