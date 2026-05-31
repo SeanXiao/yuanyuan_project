@@ -8,4 +8,6 @@ data/generated/
 data/sessions/
 *.log
 .DS_Store
-ssh/
+ssh/*
+!ssh/README.md
+!ssh/*.pub
