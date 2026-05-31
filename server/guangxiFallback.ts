@@ -29,6 +29,7 @@ const heritageCatalog: SceneOption[] = [
   { name: "侗族大歌", keywords: ["侗族", "三江", "程阳", "风雨桥", "鼓楼", "大歌", "dong"] },
   { name: "侗族木构建筑营造技艺", keywords: ["三江", "程阳", "风雨桥", "鼓楼", "木构", "桥"] },
   { name: "侗族刺绣", keywords: ["侗族", "三江", "服饰", "刺绣", "衣饰"] },
+  { name: "容县真武阁木构建筑智慧", keywords: ["玉林", "容县", "真武阁", "古建筑", "木构", "榫卯", "不用铁钉", "铁钉", "楼梯", "云朵迷宫"] },
   { name: "瑶族盘王节", keywords: ["瑶族", "盘王", "金秀", "大瑶山", "瑶山"] },
   { name: "毛南族花竹帽编织技艺", keywords: ["毛南", "环江", "花竹帽", "竹帽", "编织"] },
   { name: "天琴弹唱", keywords: ["天琴", "崇左", "龙州", "凭祥", "德天", "瀑布", "waterfall"] },
@@ -62,6 +63,7 @@ const tourismCatalog: SceneOption[] = [
   { name: "南宁青秀山", keywords: ["南宁", "青秀山", "绿城", "三月三", "歌圩", "绣球", "山歌"] },
   { name: "南宁动物园", keywords: ["南宁动物园", "动物园", "小熊猫", "动物", "zoo", "red panda"] },
   { name: "南宁三街两巷", keywords: ["三街两巷", "南宁", "老街", "骑楼", "三月三", "歌圩"] },
+  { name: "容县真武阁", keywords: ["玉林", "容县", "真武阁", "古建筑", "木构", "榫卯", "不用铁钉", "铁钉", "楼梯", "云朵迷宫"] },
   { name: "黄姚古镇", keywords: ["黄姚", "古镇", "贺州"] },
   { name: "柳州百里柳江", keywords: ["柳州", "柳江", "窑埠", "螺蛳粉"] },
   { name: "柳州窑埠古镇", keywords: ["柳州", "窑埠", "螺蛳粉", "集市", "夜市"] },
@@ -82,6 +84,7 @@ const cultureNotes: Record<string, string> = {
   侗族大歌: "侗族大歌是多声部民歌，常在三江侗寨、鼓楼和风雨桥旁唱响。",
   侗族木构建筑营造技艺: "侗族风雨桥和鼓楼多用木构营造，体现不用钉铆的建筑智慧。",
   侗族刺绣: "侗族刺绣常见于服饰和生活用品，图案细密，适合描写三江侗寨里的手作细节。",
+  容县真武阁木构建筑智慧: "容县真武阁在广西玉林容县，以精巧木构闻名，能帮助孩子理解古建筑的受力、榫卯和空间智慧。",
   瑶族盘王节: "瑶族盘王节承载祭祀、歌舞和族群记忆，适合大瑶山、金秀等场景。",
   毛南族花竹帽编织技艺: "毛南族花竹帽轻巧精美，图案和编织工序都很适合细节描写。",
   天琴弹唱: "天琴弹唱多见于桂西南，琴声清亮，适合瀑布、边关和山水夜色场景。",
@@ -127,6 +130,7 @@ const englishNameMap: Record<string, string> = {
   侗族大歌: "Dong grand song",
   侗族木构建筑营造技艺: "Dong wooden architecture",
   侗族刺绣: "Dong embroidery",
+  容县真武阁木构建筑智慧: "Rongxian Zhenwu Pavilion wooden architecture",
   瑶族盘王节: "Yao Panwang Festival",
   毛南族花竹帽编织技艺: "Maonan flower bamboo-hat weaving",
   天琴弹唱: "Tianqin singing",
@@ -157,6 +161,7 @@ const englishNameMap: Record<string, string> = {
   南宁青秀山: "Nanning Qingxiu Mountain",
   南宁动物园: "Nanning Zoo",
   南宁三街两巷: "Nanning Three Streets and Two Alleys",
+  容县真武阁: "Rongxian Zhenwu Pavilion",
   黄姚古镇: "Huangyao Ancient Town",
   柳州百里柳江: "Liuzhou Baili Liujiang scenic belt",
   柳州窑埠古镇: "Liuzhou Yaobu Ancient Town",
@@ -202,6 +207,7 @@ const englishCultureNotes: Record<string, string> = {
   侗族大歌: "Dong grand song is a multi-part folk singing tradition often heard around Sanjiang Dong villages, drum towers, and wind-rain bridges.",
   侗族木构建筑营造技艺: "Dong wind-rain bridges and drum towers show wooden building wisdom through interlocking structures.",
   侗族刺绣: "Dong embroidery appears on clothing and daily objects, adding careful handmade detail to Sanjiang village scenes.",
+  容县真武阁木构建筑智慧: "Zhenwu Pavilion in Rongxian, Yulin is known for elegant wooden structure, helping children notice balance, joinery, stairs, and ancient architecture.",
   瑶族盘王节: "The Yao Panwang Festival carries song, dance, ritual, and community memory.",
   毛南族花竹帽编织技艺: "Maonan flower bamboo hats are light and delicate, with patterns and weaving steps that suit close-up story details.",
   天琴弹唱: "Tianqin singing has a bright, clear sound and fits waterfall, border, mountain, and night scenes in southwest Guangxi.",
@@ -277,6 +283,7 @@ function tourismCultureLabel(name: string) {
     南宁青秀山: "南宁青秀山自然观察",
     南宁动物园: "南宁动物园动物观察",
     南宁三街两巷: "南宁老街城市记忆",
+    容县真武阁: "容县真武阁木构建筑智慧",
     黄姚古镇: "黄姚古镇生活美学",
     柳州百里柳江: "柳州柳江城市风景",
     柳州窑埠古镇: "柳州窑埠夜市生活",
@@ -327,7 +334,7 @@ export function buildSceneFirstHeritageGuide(idea: string, language: BookLanguag
     return [
       "Scene-first culture rule: choose Guangxi heritage elements only when they naturally fit. If no heritage element fits, introduce meaningful local highlights such as landscape, food, farming, city memory, architecture, ecology, or daily life.",
       "Do not use Zhuang brocade or bronze drum as default Guangxi symbols. Use them only when the idea mentions brocade, weaving, patterns, bronze drums, drum sounds, or a clearly related custom.",
-      "Examples: Beihai/Silver Beach/sea -> Beihai shell carving, Hepu pearls, Tanka fishing songs; Sanyuesan/song fair/mountain songs/embroidered ball -> Zhuang Sanyuesan, Zhuang mountain songs, Zhuang embroidered ball, five-color sticky rice; Sanjiang/wind-rain bridge -> Dong grand song and Dong wooden architecture; Liuzhou/food -> Luosifen making craft; Guilin/Lijiang/Liu Sanjie -> Liu Sanjie ballads and Guilin rice noodles.",
+      "Examples: Beihai/Silver Beach/sea -> Beihai shell carving, Hepu pearls, Tanka fishing songs; Sanyuesan/song fair/mountain songs/embroidered ball -> Zhuang Sanyuesan, Zhuang mountain songs, Zhuang embroidered ball, five-color sticky rice; Sanjiang/wind-rain bridge -> Dong grand song and Dong wooden architecture; Yulin/Rongxian/Zhenwu Pavilion/wooden stairs -> Zhenwu Pavilion wooden architecture; Liuzhou/food -> Luosifen making craft; Guilin/Lijiang/Liu Sanjie -> Liu Sanjie ballads and Guilin rice noodles.",
       `For this idea, prefer culture highlights such as: ${displayHeritage.join(", ")}. Prefer travel scenes such as: ${displayTourism.join(", ")}.`
     ].join("\n");
   }
@@ -335,7 +342,7 @@ export function buildSceneFirstHeritageGuide(idea: string, language: BookLanguag
   return [
     "文化选择原则：先读学生灵感里的地点、节日、食物、声音、人物和动作；有自然贴合的非遗就介绍非遗，没有非遗也可以介绍有意义的地方亮点，如山水、物产、农耕、城市记忆、建筑、生态或日常生活。",
     "不要把壮锦、铜鼓当作默认广西符号；只有学生提到织锦、纹样、铜鼓、鼓声，或故事场景确实相关时才使用。",
-    "示例：北海/银滩/海边 -> 北海贝雕、合浦南珠制作技艺、疍家渔歌；三娘湾/钦州/海豚/螃蟹/赶海 -> 三娘湾中华白海豚生态观察、钦州海边赶海生活、钦州三娘湾海洋观察；三月三/歌圩/山歌/绣球 -> 壮族三月三、壮族山歌、壮族绣球、五色糯米饭；三江/风雨桥 -> 侗族大歌、侗族木构建筑营造技艺；柳州/美食 -> 柳州螺蛳粉制作技艺；桂林/漓江/刘三姐 -> 刘三姐歌谣、桂林米粉制作技艺。",
+    "示例：北海/银滩/海边 -> 北海贝雕、合浦南珠制作技艺、疍家渔歌；三娘湾/钦州/海豚/螃蟹/赶海 -> 三娘湾中华白海豚生态观察、钦州海边赶海生活、钦州三娘湾海洋观察；三月三/歌圩/山歌/绣球 -> 壮族三月三、壮族山歌、壮族绣球、五色糯米饭；三江/风雨桥 -> 侗族大歌、侗族木构建筑营造技艺；玉林/容县/真武阁/木楼梯 -> 容县真武阁木构建筑智慧；柳州/美食 -> 柳州螺蛳粉制作技艺；桂林/漓江/刘三姐 -> 刘三姐歌谣、桂林米粉制作技艺。",
     `本次灵感优先考虑这些文化亮点：${heritage.join("、")}。文旅场景优先考虑：${tourism.join("、")}。`
   ].join("\n");
 }
@@ -432,6 +439,9 @@ function makeFallbackTitle(idea: string, language: BookLanguage) {
     if (ideaIncludesAny(idea, ["三江", "风雨桥", "侗族", "dong"])) {
       return "The Dong Grand Song by the Wind-Rain Bridge";
     }
+    if (ideaIncludesAny(idea, ["玉林", "容县", "真武阁", "zhenwu", "rongxian"])) {
+      return "The Cloud Maze in Zhenwu Pavilion";
+    }
     if (ideaIncludesAny(idea, ["柳州", "螺蛳粉", "liuzhou", "luosifen"])) {
       return "A Heritage Market Scented with Luosifen";
     }
@@ -455,6 +465,9 @@ function makeFallbackTitle(idea: string, language: BookLanguage) {
   }
   if (ideaIncludesAny(idea, ["三江", "风雨桥", "侗族", "鼓楼"])) {
     return "风雨桥边的侗族大歌";
+  }
+  if (ideaIncludesAny(idea, ["玉林", "容县", "真武阁", "古建筑", "不用铁钉", "云朵迷宫"])) {
+    return "真武阁里的云朵楼梯";
   }
   if (ideaIncludesAny(idea, ["柳州", "螺蛳粉"])) {
     return "螺蛳粉香气里的文化集市";
@@ -498,6 +511,31 @@ function makeChineseFallbackPages(
         title: "烧烤香里的小导游词",
         text:
           "傍晚，海边飘来玉米和烤虾的香味，我一边吃晚饭，一边把今天的发现讲给家人听：三娘湾有海风、蟹洞、渔船，也有需要人们保护的海豚朋友。桂小雅帮我把这些话整理成绘本。我想把这本书带回班里，邀请同学们一起温柔地认识大海。"
+      }
+    ];
+  }
+
+  if (ideaIncludesAny(idea, ["玉林", "容县", "真武阁", "古建筑", "不用铁钉", "云朵迷宫"])) {
+    return [
+      {
+        title: "楼梯变成云朵",
+        text:
+          "我和桂小雅来到玉林容县真武阁前，木楼梯忽然像白白的云一样轻轻升起。桂小雅没有急着闯关，而是提醒我先看柱子、横梁和屋檐怎样互相支撑。我把第一朵云画进本子，故事从一座会提问的古建筑开始。"
+      },
+      {
+        title: "迷宫里的木头线索",
+        text:
+          "云朵迷宫里没有怪声，只有木头轻轻咔哒的想象声。我摸着栏杆往前走，发现每一根木构件都像拼图一样找到自己的位置。桂小雅把榫卯结构画成小图标，让我明白古人用连接和受力，让楼阁稳稳站立。"
+      },
+      {
+        title: "不用铁钉的秘密",
+        text:
+          "走到转角时，云朵门打开了，里面是一座小小的木构模型。我试着把梁、柱、斗拱一样一样摆好，模型就站住了。原来真武阁的厉害，不是靠魔法，而是靠工匠反复计算、观察材料、懂得让每一部分一起用力。"
+      },
+      {
+        title: "我的古建筑讲解",
+        text:
+          "最后，我把云朵楼梯变回画本里的路线图，给同学们写下一段讲解词：容县真武阁让我们看到广西古建筑的智慧，也提醒我们保护老建筑。桂小雅点亮屏幕说，真正的闯关成功，是把发现讲给更多人听。"
       }
     ];
   }
@@ -570,7 +608,7 @@ export function createFallbackBook(idea: string, language: BookLanguage = "zh", 
       studentReflection: "I learned that cultural highlights should grow from the place, characters, and action in my story, not be added just because they are famous.",
       aiContentRatio: 88,
       promptRecords: [
-        makePromptRecord("story", "Story Generation Prompt", storyPrompt, "Generated a 4-page picture book, outline, guide script, and culture notes."),
+        makePromptRecord("story", "Core Story Creation Prompt", storyPrompt, "Generated a 4-page picture book, outline, guide script, and culture notes."),
         ...pages.map((page) => makePromptRecord("image", `Page ${page.pageNumber} Image Prompt`, page.imagePrompt, "Waiting for image generation or using a local demo illustration."))
       ]
     };
@@ -613,7 +651,7 @@ export function createFallbackBook(idea: string, language: BookLanguage = "zh", 
     studentReflection: "我发现文化亮点不是硬塞进故事里的标签，而是要从地点、人物和情节里自然长出来。",
     aiContentRatio: 88,
     promptRecords: [
-      makePromptRecord("story", "桂韵创想家 核心提示词", storyPrompt, "已生成 4 页绘本故事、大纲、文旅讲解和文化小百科。"),
+      makePromptRecord("story", "核心创建故事提示词", storyPrompt, "已生成 4 页绘本故事、大纲、文旅讲解和文化小百科。"),
       ...pages.map((page) => makePromptRecord("image", `第 ${page.pageNumber} 页图片提示词`, page.imagePrompt, "等待图片生成或使用本地演示插图。"))
     ]
   };

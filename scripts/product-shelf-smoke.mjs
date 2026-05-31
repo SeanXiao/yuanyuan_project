@@ -217,7 +217,7 @@ async function main() {
     assert(records.text.includes("核心创建故事提示词"), "records page shows core prompt tab by default");
     await client.evaluate(() => {
       const tab = [...document.querySelectorAll(".record-tab-button")].find((button) => button.textContent.includes("故事输出"));
-      tab?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      tab?.click();
       return true;
     });
     await client.waitFor(() => document.body.innerText.includes("各页故事与插图提示词") && document.querySelectorAll(".record-page-tab").length >= 4);

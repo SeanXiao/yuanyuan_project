@@ -7,8 +7,10 @@ export const companionSchool = "桂雅路小学";
 
 export function displayText(text = "") {
   return text
-    .replace(/百炼故事生成 Prompt/gu, "桂韵创想家 核心提示词")
-    .replace(/故事生成 Prompt/gu, "桂韵创想家 核心提示词")
+    .replace(/桂韵创想家 核心提示词/gu, "核心创建故事提示词")
+    .replace(/百炼故事生成 Prompt/gu, "核心创建故事提示词")
+    .replace(/故事生成 Prompt/gu, "核心创建故事提示词")
+    .replace(/Guiyun Creator Core Prompt/gu, "Core Story Creation Prompt")
     .replace(/肖予曦的绘本书架/gu, bookshelfTitle)
     .replace(/肖予曦/gu, "我")
     .replace(/桂小灵/gu, companionName)

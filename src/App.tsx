@@ -120,6 +120,28 @@ const defaultInspirationChips = [
   "钦州坭兴陶小杯接住海浪"
 ];
 
+async function readApiJson<T>(response: Response, emptyMessage = "服务返回内容为空，请稍后再试。") {
+  const text = await response.text().catch(() => "");
+  const data = text
+    ? (() => {
+        try {
+          return JSON.parse(text) as (T & { error?: string }) | null;
+        } catch {
+          return null;
+        }
+      })()
+    : null;
+
+  if (!response.ok) {
+    throw new Error(data?.error || emptyMessage);
+  }
+  if (!data) {
+    throw new Error(emptyMessage);
+  }
+
+  return data as T;
+}
+
 const englishDisplayTerms: Record<string, string> = {
   桂小雅: "Gui Xiaoya",
   "是广西文化元素，适合和相关地点、人物或行动自然连在一起。": " is a Guangxi local highlight. Use it when it naturally connects with the place, characters, or action.",
@@ -360,7 +382,7 @@ async function speakWithServerVoice(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, protagonistGender })
   });
-  const data = (await response.json()) as { audioUrl?: string; error?: string };
+  const data = await readApiJson<{ audioUrl?: string; error?: string }>(response, "朗读音频生成失败");
   if (!response.ok || !data.audioUrl) {
     throw new Error(data.error || "TTS failed");
   }
@@ -449,6 +471,9 @@ function softenDisplayText(text = "") {
     .replace(/未定义/gu, "")
     .replace(/和\s*([。！？!?；;，,])/gu, "$1")
     .replace(/与\s*([。！？!?；;，,])/gu, "$1")
+    .replace(/桂韵创想家 核心提示词/gu, "核心创建故事提示词")
+    .replace(/百炼故事生成 Prompt/gu, "核心创建故事提示词")
+    .replace(/Guiyun Creator Core Prompt/giu, "Core Story Creation Prompt")
     .replace(/Prompt\s*记录/giu, "创作记录")
     .replace(/图片\s*Prompt/giu, "插图灵感")
     .replace(/故事生成\s*Prompt/giu, "故事灵感整理")
@@ -745,14 +770,14 @@ export default function App({ embeddedInProduct = false }: { embeddedInProduct?:
 
   async function refreshBooks() {
     const response = await fetch("/api/picture-books");
-    const data = (await response.json()) as { books?: PictureBookSummary[] };
+    const data = await readApiJson<{ books?: PictureBookSummary[] }>(response, "书架刷新失败");
     setBooks(data.books || []);
     return data.books || [];
   }
 
   async function loadBook(id: string, options?: { silent?: boolean }) {
     const response = await fetch(`/api/picture-books/${encodeURIComponent(id)}`);
-    const data = (await response.json()) as { book?: PictureBook; error?: string };
+    const data = await readApiJson<{ book?: PictureBook; error?: string }>(response, "作品打开失败");
     if (!response.ok || !data.book) {
       throw new Error(data.error || "作品不存在");
     }
@@ -769,7 +794,7 @@ export default function App({ embeddedInProduct = false }: { embeddedInProduct?:
   async function preloadSpeechForBook(bookId: string) {
     try {
       const response = await fetch(`/api/picture-books/${encodeURIComponent(bookId)}/speech/preload`, { method: "POST" });
-      const data = (await response.json()) as { book?: PictureBook; books?: PictureBookSummary[] };
+      const data = await readApiJson<{ book?: PictureBook; books?: PictureBookSummary[] }>(response, "朗读预加载失败");
       if (!response.ok || !data.book) {
         return null;
       }
@@ -828,7 +853,7 @@ export default function App({ embeddedInProduct = false }: { embeddedInProduct?:
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ idea: cleanIdea, language: bookLanguage, protagonistGender, generateImage: false })
       });
-      const data = (await response.json()) as { book?: PictureBook; books?: PictureBookSummary[]; error?: string };
+      const data = await readApiJson<{ book?: PictureBook; books?: PictureBookSummary[]; error?: string }>(response, "绘本制作失败");
       if (!response.ok || !data.book) {
         throw new Error(data.error || "绘本制作失败");
       }
@@ -956,7 +981,7 @@ export default function App({ embeddedInProduct = false }: { embeddedInProduct?:
     );
 
     const response = await fetch(`/api/picture-books/${bookId}/pages/${pageNumber}/image`, { method: "POST" });
-    const data = (await response.json()) as { book?: PictureBook; error?: string };
+    const data = await readApiJson<{ book?: PictureBook; error?: string }>(response, "插图暂时没画好");
     if (!response.ok || !data.book) {
       setGenerationProgress((current) =>
         current
@@ -990,7 +1015,7 @@ export default function App({ embeddedInProduct = false }: { embeddedInProduct?:
 
   async function deleteBook(id: string) {
     const response = await fetch(`/api/picture-books/${encodeURIComponent(id)}`, { method: "DELETE" });
-    const data = (await response.json()) as { books?: PictureBookSummary[] };
+    const data = await readApiJson<{ books?: PictureBookSummary[] }>(response, "绘本删除失败");
     setBooks(data.books || []);
     if (activeBook?.id === id) {
       setActiveBook(null);
@@ -1024,7 +1049,7 @@ export default function App({ embeddedInProduct = false }: { embeddedInProduct?:
           language: bookLanguage
         })
       });
-      const data = (await response.json()) as { chips?: string[]; contextLabel?: string; error?: string };
+      const data = await readApiJson<{ chips?: string[]; contextLabel?: string; error?: string }>(response, "灵感锦囊生成失败");
       if (!response.ok || !data.chips?.length) {
         throw new Error(data.error || "灵感锦囊生成失败");
       }
