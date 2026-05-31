@@ -182,6 +182,25 @@ function isGeneratedImageRecord(record: PromptRecord) {
   return Boolean(extractImageSource(record.output));
 }
 
+function getDisplayImageRecords(records: PromptRecord[]) {
+  const latestRecordByPage = new Map<string, PromptRecord>();
+  records
+    .filter((record) => record.type === "image" && isGeneratedImageRecord(record))
+    .forEach((record) => {
+      const pageNumber = getPromptRecordPageNumber(record);
+      latestRecordByPage.set(pageNumber ? `page-${pageNumber}` : record.id, record);
+    });
+
+  return [...latestRecordByPage.values()].sort((left, right) => {
+    const leftPage = getPromptRecordPageNumber(left) || Number.MAX_SAFE_INTEGER;
+    const rightPage = getPromptRecordPageNumber(right) || Number.MAX_SAFE_INTEGER;
+    if (leftPage !== rightPage) {
+      return leftPage - rightPage;
+    }
+    return left.createdAt.localeCompare(right.createdAt);
+  });
+}
+
 function cleanSpeechPart(text = "") {
   return text
     .replace(/第\s*\d+\s*页[，,：:\s]*/gu, "")
@@ -1531,7 +1550,7 @@ function RecordsLibrary({
 }) {
   const records = activeBook?.promptRecords || [];
   const storyRecords = records.filter((record) => record.type === "story");
-  const imageRecords = records.filter((record) => record.type === "image" && isGeneratedImageRecord(record));
+  const imageRecords = getDisplayImageRecords(records);
   const [activeRecordTab, setActiveRecordTab] = useState<RecordTabKey>("story");
   const [activeRecordPage, setActiveRecordPage] = useState(1);
   const cultureNoteLabel = getCultureNoteLabel(activeBook?.language || "zh");
@@ -1703,7 +1722,7 @@ function RecordsLibrary({
                   {activeRecordTab === "images" ? (
                     <PromptGroup
                       title="插图生成记录"
-                      description="只显示实际生成图片的记录；每页插图提示词可以在“故事输出”里查看。"
+                      description="每页只显示最新一次实际生成图片的记录；插图提示词可以在“故事输出”里查看。"
                       records={imageRecords}
                       imagePreviewPages={activeBook.pages}
                       emptyText="这本绘本还没有实际生成过插图。"
