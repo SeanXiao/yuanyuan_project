@@ -86,11 +86,11 @@ export async function deletePictureBook(id: string) {
   return data.books || [];
 }
 
-export async function synthesizePictureBookSpeech(text: string, protagonistGender: ProtagonistGender) {
+export async function synthesizePictureBookSpeech(text: string, protagonistGender: ProtagonistGender, language: BookLanguage) {
   const response = await fetch("/api/speech", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, protagonistGender })
+    body: JSON.stringify({ text, protagonistGender, language })
   });
   const data = await readJson<SpeechResponse>(response);
   if (!data.audioUrl) {

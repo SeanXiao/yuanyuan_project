@@ -230,9 +230,9 @@ function guiXiaolingVisualSpec(language: BookLanguage = "zh") {
   }
 
   return [
-    "桂小雅视觉锁定：可爱的白蓝配色圆润机器人吉祥物，黑色发光屏幕脸、青蓝色笑脸和爱心灯、耳麦、亲切儿童化表情，整体像柔和精致的 3D 玩具机器人。",
+    "桂小雅视觉锁定：可爱的白蓝配色圆润机器人吉祥物，黑色发光屏幕脸、青蓝色笑脸和爱心灯、耳麦、亲切儿童化表情，整体像柔和精致的三维玩具机器人。",
     "广西特色细节：靛蓝民族风格头巾，带青蓝、白、红、金色几何边纹，头巾结旁有轻巧银饰小挂件；蓝色披风、袖口/披风/本子有少量广西民族纹样点缀。不要把这些装饰当成故事必须出现的非遗主题。",
-    "绘本插图中，桂小雅必须作为固定的画册机器人伙伴出现，不要画成普通 AI 助手、人类小孩、动物或其他无关机器人。"
+    "绘本插图中，桂小雅必须作为固定的画册机器人伙伴出现，不要画成普通智能助手、人类小孩、动物或其他无关机器人。"
   ].join(" ");
 }
 
@@ -244,8 +244,8 @@ function protagonistVisualSpec(language: BookLanguage = "zh", gender: Protagonis
   }
 
   return gender === "boy"
-    ? "小学生主角视觉锁定：一位 8-10 岁广西小学生男孩，明亮眼睛、友好表情，穿红蓝相间、带少量广西民族纹样点缀的小外套，背一个小书包。"
-    : "小学生主角视觉锁定：一位 8-10 岁广西小学生女孩，明亮眼睛、友好表情，穿红蓝相间、带少量广西民族纹样点缀的小外套，背一个小书包。";
+    ? "小学生主角视觉锁定：一位八到十岁广西小学生男孩，明亮眼睛、友好表情，穿红蓝相间、带少量广西民族纹样点缀的小外套，背一个小书包。"
+    : "小学生主角视觉锁定：一位八到十岁广西小学生女孩，明亮眼睛、友好表情，穿红蓝相间、带少量广西民族纹样点缀的小外套，背一个小书包。";
 }
 
 function textFreeImageRule(language: BookLanguage = "zh") {
@@ -259,7 +259,7 @@ function textFreeImageRule(language: BookLanguage = "zh") {
 
   return [
     "无文字画面规则：最终插图中不得出现任何可读字符。",
-    "不要画汉字、英文、拼音、数字、标点、字幕、对白气泡、标签、招牌、牌匾、横幅、页码、水印、Logo、界面文字、书页文字、纸条、展板、纪念碑文字或题字。",
+    "不要画汉字、英文、拼音、数字、标点、字幕、对白气泡、标签、招牌、牌匾、横幅、页码、水印、标识、界面文字、书页文字、纸条、展板、纪念碑文字或题字。",
     "如果场景自然包含招牌、牌匾、书本、纸张、横幅、纪念碑或展板，请画成空白、装饰纹理或不可读纹理。"
   ].join(" ");
 }
@@ -365,6 +365,56 @@ function cleanGeneratedText(value: unknown = "", language: BookLanguage = "zh") 
     .replace(/[ \t]{2,}/gu, " ")
     .replace(/\n{3,}/gu, "\n\n")
     .trim();
+}
+
+function containsLatinLetters(value = "") {
+  return /[A-Za-z]/u.test(value);
+}
+
+function compactImagePromptText(value = "", maxLength = 120) {
+  const clean = value.replace(/\s+/gu, " ").trim();
+  if (clean.length <= maxLength) {
+    return clean;
+  }
+  return `${clean.slice(0, maxLength).replace(/[，,、；;：:\s]+$/gu, "")}。`;
+}
+
+function replaceCommonEnglishInChineseImagePrompt(prompt = "") {
+  return prompt
+    .replace(/children'?s book illustration/giu, "儿童绘本插图")
+    .replace(/watercolor style/giu, "水彩风格")
+    .replace(/watercolor/giu, "水彩")
+    .replace(/new[-\s]?Chinese illustration style/giu, "国潮插画风格")
+    .replace(/No readable text/giu, "画面无可读文字")
+    .replace(/No text/giu, "画面无文字")
+    .replace(/No letters/giu, "不要画字母")
+    .replace(/No numbers/giu, "不要画数字")
+    .replace(/No signs/giu, "不要画招牌")
+    .replace(/No watermarks/giu, "不要画水印")
+    .replace(/\bGui Xiaoya\b/giu, "桂小雅")
+    .replace(/\bAI\b/giu, "智能")
+    .replace(/\b3D\b/giu, "三维")
+    .replace(/\bLogo\b/giu, "标识")
+    .trim();
+}
+
+function buildChineseImagePromptFromPage(pageTitle = "", pageText = "", cultureNote = "") {
+  const parts = [
+    "儿童绘本插图，温暖明亮的水彩风格，画面适合小学生阅读。",
+    pageTitle ? `本页主题：${pageTitle}。` : "",
+    pageText ? `画面表现：${compactImagePromptText(pageText, 140)}` : "",
+    cultureNote ? `广西文化细节：${compactImagePromptText(cultureNote, 90)}` : "",
+    "只画一个关键瞬间，突出人物动作、环境和地方文化细节，不要出现任何可读文字。"
+  ];
+  return parts.filter(Boolean).join("\n");
+}
+
+function ensureChineseImagePrompt(prompt = "", pageTitle = "", pageText = "", cultureNote = "") {
+  const localizedPrompt = replaceCommonEnglishInChineseImagePrompt(cleanGeneratedText(prompt, "zh"));
+  if (localizedPrompt && !containsLatinLetters(localizedPrompt)) {
+    return localizedPrompt;
+  }
+  return buildChineseImagePromptFromPage(pageTitle, pageText, cultureNote);
 }
 
 function compactStoryText(value = "") {
@@ -733,15 +783,25 @@ function normalizeDraft(idea: string, draft: BookDraft, language: BookLanguage, 
     tourismElements: sceneFirstTourismElements(idea, draft.tourismElements || fallback.tourismElements, language),
     guidingQuestions: (draft.guidingQuestions || fallback.guidingQuestions).slice(0, 3).map((item) => cleanGeneratedText(item, language)),
     outline: cleanGeneratedText(draft.outline || fallback.outline, language),
-    pages: pages.map((page, index) => ({
-      pageNumber: index + 1,
-      title: cleanGeneratedText(page.title || fallback.pages[index]?.title || `第 ${index + 1} 页`, language),
-      text: cleanGeneratedText(page.text || fallback.pages[index]?.text || "", language),
-      imagePrompt: withCharacterImagePrompt(cleanGeneratedText(page.imagePrompt || fallback.pages[index]?.imagePrompt || "", language), language, protagonistGender),
-      imageUrl: page.imageUrl || "",
-      imageSource: page.imageSource || "placeholder",
-      cultureNote: cleanGeneratedText(page.cultureNote || fallback.pages[index]?.cultureNote || "", language)
-    })),
+    pages: pages.map((page, index) => {
+      const title = cleanGeneratedText(page.title || fallback.pages[index]?.title || `第 ${index + 1} 页`, language);
+      const text = cleanGeneratedText(page.text || fallback.pages[index]?.text || "", language);
+      const cultureNote = cleanGeneratedText(page.cultureNote || fallback.pages[index]?.cultureNote || "", language);
+      const rawImagePrompt = page.imagePrompt || fallback.pages[index]?.imagePrompt || "";
+      const imagePrompt =
+        language === "zh"
+          ? ensureChineseImagePrompt(rawImagePrompt, title, text, cultureNote)
+          : cleanGeneratedText(rawImagePrompt, language);
+      return {
+        pageNumber: index + 1,
+        title,
+        text,
+        imagePrompt: withCharacterImagePrompt(imagePrompt, language, protagonistGender),
+        imageUrl: page.imageUrl || "",
+        imageSource: page.imageSource || "placeholder",
+        cultureNote
+      };
+    }),
     tourGuideScript: cleanGeneratedText(draft.tourGuideScript || fallback.tourGuideScript, language),
     studentReflection: cleanGeneratedText(draft.studentReflection || fallback.studentReflection, language),
     aiContentRatio: Number(draft.aiContentRatio || 90)
@@ -788,7 +848,8 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
           "不要主动添加三月三、歌圩、山歌、绣球、刘三姐、壮锦、铜鼓，除非学生灵感明确出现这些词或高度相关场景。",
           "每页必须有具体地点、人物动作和文化细节，避免只写“非遗文化”“传统技艺”“秘密”这类空泛表达。",
           "安全：适合 6-12 岁儿童，不出现危险、恐怖、成人化、商业广告或编造政策内容。",
-          "语言：所有面向读者的故事字段必须使用自然中文。",
+          "语言：所有面向读者的故事字段必须使用自然中文；pages[].imagePrompt 的字段值也必须使用简体中文，JSON 字段名除外。",
+          "中文图片提示词硬性规则：imagePrompt 字段值不得出现英文单词、英文字母、英文短语或中英双语句子。",
           "输出：只输出 JSON，不要解释，不要 Markdown。"
         ].join("\n");
 
@@ -831,13 +892,14 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
           "originalIdea: 原始灵感",
           "language: 固定为 \"zh\"",
           `protagonistGender: 固定为 "${protagonistGender}"`,
-          `故事正文和图片 Prompt 中的小学生主角必须始终是${protagonistGender === "boy" ? "男孩" : "女孩"}。`,
+          `故事正文和图片提示词中的小学生主角必须始终是${protagonistGender === "boy" ? "男孩" : "女孩"}。`,
           "如果故事里出现帮助我的机器人或 AI 伙伴，请每次都称呼它为“桂小雅”。",
           "heritageElements: 2-5 个与场景贴合的广西文化亮点。可以是非遗，也可以是地方风景、物产农耕、美食、生态、建筑、城市记忆或日常生活。宁可少而准确，不要堆砌知名但无关的符号。",
           "tourismElements: 2-5 个广西文旅元素",
           "guidingQuestions: 2-3 个用于启发学生继续创编的问题",
           "outline: 80 字以内故事大纲",
           "pages: 4 页数组，每页包含 pageNumber, title, text, imagePrompt, cultureNote",
+          "imagePrompt: 字段名固定为 imagePrompt；字段值必须是全中文图片提示词，只能用简体中文描述画面，不要写 Children's book illustration、watercolor style、No text、No letters、No watermarks 等英文短语，也不要写中英双语。",
           "每页正文以 140-180 个中文字为目标，尽量不要超过 190 字；整本要像真正绘本朗读故事，不要缩水成一句提纲，也不要只写说明文字。",
           "每页正文要适合直接画成插图：一个清楚画面、一个动作、一个具体广西细节。",
           "每页 cultureNote 必须写成儿童版“小百科”卡片，45-70 个中文字。要介绍当前页最贴合的广西文化、非遗、地点、物产、生态或习俗：它是什么、来自哪里或怎么做、为什么值得知道。自然贴合时优先介绍非遗；如果只是动物、风景或城市记忆，不要硬说成非遗。",
@@ -845,12 +907,12 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
           "tourGuideScript: 小学生能朗读的 120 字以内文旅讲解词",
           "studentReflection: 60 字以内学生创作反思",
           "aiContentRatio: 80 到 95 的数字",
-          "图片 Prompt 要适合儿童绘本、水彩或国潮插画风格，明确与当前场景贴合的广西文化元素。",
-          "每页图片 Prompt 必须明确禁止可读文字：不要汉字、英文、拼音、数字、字幕、对白气泡、标签、招牌、牌匾、横幅、页码、水印、Logo、界面文字、书页文字、纸条、展板、纪念碑文字或题字；如果场景出现招牌、牌匾、书本、纸张、横幅、纪念碑或展板，只能画成空白或不可读纹理。",
-          "图片 Prompt 不得要求模型把故事正文、页标题、说明文字、文化小知识或标签画进图片里。",
-          `图片 Prompt 必须保持这个小学生主角设定：${protagonistVisualSpec("zh", protagonistGender)}`,
-          `图片 Prompt 必须使用这个画册机器人角色设定：${guiXiaolingVisualSpec("zh")}`,
-          "4 页图片 Prompt 必须保持同一位小学生主角、同一套服装、同一绘本画风和连续故事氛围，只改变每页场景与动作。"
+          "图片提示词要适合儿童绘本、水彩或国潮插画风格，明确与当前场景贴合的广西文化元素。",
+          "每页图片提示词必须明确禁止可读文字：不要汉字、英文、拼音、数字、字幕、对白气泡、标签、招牌、牌匾、横幅、页码、水印、标识、界面文字、书页文字、纸条、展板、纪念碑文字或题字；如果场景出现招牌、牌匾、书本、纸张、横幅、纪念碑或展板，只能画成空白或不可读纹理。",
+          "图片提示词不得要求模型把故事正文、页标题、说明文字、文化小知识或标签画进图片里。",
+          `图片提示词必须保持这个小学生主角设定：${protagonistVisualSpec("zh", protagonistGender)}`,
+          `图片提示词必须使用这个画册机器人角色设定：${guiXiaolingVisualSpec("zh")}`,
+          "4 页图片提示词必须保持同一位小学生主角、同一套服装、同一绘本画风和连续故事氛围，只改变每页场景与动作。"
         ].join("\n");
 
   try {
@@ -884,7 +946,7 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
         ...normalized.pages.map((page) =>
           makePromptRecord(
             "image",
-            language === "en" ? `Page ${page.pageNumber} Image Prompt` : `第 ${page.pageNumber} 页图片 Prompt`,
+            language === "en" ? `Page ${page.pageNumber} Image Prompt` : `第 ${page.pageNumber} 页图片提示词`,
             page.imagePrompt,
             language === "en" ? "Waiting for image generation." : "等待图片生成。"
           )

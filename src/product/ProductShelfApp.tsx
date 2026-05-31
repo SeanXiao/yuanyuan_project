@@ -4,18 +4,25 @@ import {
   BookOpen,
   ChevronLeft,
   Clock,
+  Compass,
+  Cpu,
   Edit3,
   ExternalLink,
   FileText,
   Home,
   Image as ImageIcon,
+  Info,
+  Lightbulb,
   LoaderCircle,
   Mic,
   MicOff,
   Paintbrush,
   Plus,
   RefreshCw,
+  Route,
   Send,
+  ShieldCheck,
+  Sparkles,
   Trash2,
   Volume2
 } from "lucide-react";
@@ -33,7 +40,7 @@ import { bookshelfTitle, companionName, companionSchool, displayBook, displayBoo
 import { speakProductText, stopProductSpeech } from "./productSpeech";
 import type { BookLanguage, PictureBook, PictureBookPage, PictureBookSummary, PromptRecord, ProtagonistGender } from "./types";
 
-type ProductView = "shelf" | "desk" | "detail" | "records" | "theater";
+type ProductView = "shelf" | "desk" | "detail" | "records" | "theater" | "about";
 type ImageTaskStatus = "idle" | "running" | "done" | "error";
 type ProductStage = "input" | "analysis" | "content" | "images" | "saved";
 type RecordTabKey = "story" | "pages" | "images" | "system" | "culture";
@@ -81,6 +88,9 @@ function parseProductRoute(hash = window.location.hash): { view: ProductView; bo
   }
   if (section === "records") {
     return { view: "records" };
+  }
+  if (section === "about") {
+    return { view: "about" };
   }
   if (section === "theater") {
     return { view: "theater" };
@@ -187,6 +197,20 @@ function buildPageReadText(book: PictureBook, page: PictureBookPage, includeCult
   return `${parts.join(separator)}${endMark}`;
 }
 
+function pageNeedsSpeechPreload(book: PictureBook, page: PictureBookPage) {
+  if (!page.speechAudioUrl) {
+    return true;
+  }
+  if (page.speechAudioText !== buildPageReadText(book, page, true)) {
+    return true;
+  }
+  return (book.language || "zh") === "en" && page.speechAudioLanguage !== "en";
+}
+
+function getCultureNoteLabel(language: BookLanguage = "zh") {
+  return language === "en" ? "Guangxi Culture Mini Encyclopedia" : "广西文化小百科";
+}
+
 function mergePictureBook(current: PictureBook | null, incoming: PictureBook) {
   if (!current || current.id !== incoming.id) {
     return incoming;
@@ -205,7 +229,9 @@ function mergePictureBook(current: PictureBook | null, incoming: PictureBook) {
         imageUrl: page.imageUrl || currentPage?.imageUrl || "",
         imageSource: page.imageUrl ? page.imageSource : currentPage?.imageSource || page.imageSource,
         speechAudioText: page.speechAudioText || currentPage?.speechAudioText,
-        speechAudioUrl: page.speechAudioUrl || currentPage?.speechAudioUrl
+        speechAudioUrl: page.speechAudioUrl || currentPage?.speechAudioUrl,
+        speechAudioVoice: page.speechAudioVoice || currentPage?.speechAudioVoice,
+        speechAudioLanguage: page.speechAudioLanguage || currentPage?.speechAudioLanguage
       };
     }),
     promptRecords: [...mergedRecords.values()]
@@ -348,7 +374,7 @@ export default function ProductShelfApp() {
       if (!options?.silent) {
         setNotice("绘本已经打开，可以查看故事、小百科、创作记录或进入绘本剧场。");
       }
-      if ((book.language || "zh") === "zh" && book.pages.some((page) => !page.speechAudioUrl)) {
+      if (book.pages.some((page) => pageNeedsSpeechPreload(book, page))) {
         void preloadSpeech(book.id);
       }
       return book;
@@ -389,6 +415,11 @@ export default function ProductShelfApp() {
     window.location.hash = "#/records";
     setView("records");
     void refreshBooks({ selectLatest: true, silent: true });
+  }
+
+  function navigateToAbout() {
+    window.location.hash = "#/about";
+    setView("about");
   }
 
   function navigateToBook(bookId: string, nextView: ProductView = "detail") {
@@ -694,9 +725,15 @@ export default function ProductShelfApp() {
     setReadingPageNumber(null);
   }
 
-  function getReusablePageAudio(rawBook: PictureBook, rawPage: PictureBookPage, language: BookLanguage) {
+  function getReusablePageAudio(rawBook: PictureBook, rawPage: PictureBookPage) {
     const rawPageReadText = buildPageReadText(rawBook, rawPage, true);
-    return language === "zh" && rawPageReadText === displayText(rawPageReadText) ? rawPage.speechAudioUrl : undefined;
+    if (rawPageReadText !== displayText(rawPageReadText)) {
+      return undefined;
+    }
+    if ((rawBook.language || "zh") === "en" && rawPage.speechAudioLanguage !== "en") {
+      return undefined;
+    }
+    return rawPage.speechAudioUrl;
   }
 
   function readCurrentPage(languageOverride?: BookLanguage) {
@@ -713,7 +750,7 @@ export default function ProductShelfApp() {
       buildPageReadText(activeBook, selectedPage, true),
       language,
       activeBook.protagonistGender || "girl",
-      rawSelectedPage ? getReusablePageAudio(activeBook, rawSelectedPage, language) : undefined
+      rawSelectedPage ? getReusablePageAudio(activeBook, rawSelectedPage) : undefined
     )
       .catch(() => {
         if (readingSessionRef.current === sessionId) {
@@ -752,7 +789,7 @@ export default function ProductShelfApp() {
             buildPageReadText(displayBookForReading, page, true),
             language,
             protagonistGender,
-            getReusablePageAudio(rawBook, rawPage, language)
+            getReusablePageAudio(rawBook, rawPage)
           );
         }
       } catch {
@@ -792,6 +829,10 @@ export default function ProductShelfApp() {
             <button type="button" className={view === "records" ? "active" : ""} onClick={navigateToRecords}>
               <FileText size={17} />
               创作记录
+            </button>
+            <button type="button" className={view === "about" ? "active" : ""} onClick={navigateToAbout}>
+              <Info size={17} />
+              项目介绍
             </button>
           </nav>
         </header>
@@ -904,6 +945,8 @@ export default function ProductShelfApp() {
         />
       ) : null}
 
+      {view === "about" ? <ProjectAboutPage onStartCreate={startNewBook} onGoToShelf={navigateToShelf} /> : null}
+
       {view === "theater" ? (
         <TheaterWorkspace
           activeBook={displayActiveBook}
@@ -942,6 +985,177 @@ export default function ProductShelfApp() {
         </div>
       ) : null}
     </main>
+  );
+}
+
+const aboutBusinessCards = [
+  {
+    icon: Lightbulb,
+    title: "我们为什么想做",
+    text: "我们三个小朋友喜欢故事、绘画和家乡文化，也想练习表达能力，所以想做一个能把一句灵感变成绘本的 AI 创作伙伴。"
+  },
+  {
+    icon: Compass,
+    title: "我们想介绍广西",
+    text: "我们希望故事里能自然出现三月三、山歌、绣球、漓江、螺蛳粉、坭兴陶和三娘湾这些熟悉又有特色的广西元素。"
+  },
+  {
+    icon: Sparkles,
+    title: "我们和 AI 分工",
+    text: "我们负责提出想法、判断故事好不好、选择想展示的文化；AI 负责追问、整理、画图和朗读，最后一起完成作品。"
+  }
+];
+
+const aboutTechCards = [
+  {
+    icon: Cpu,
+    title: "我们搭了两个工作区",
+    text: "前端像看得见的舞台，负责书架、书桌、阅读和剧场；后端像后台工作间，负责保护密钥、调用模型和保存作品。"
+  },
+  {
+    icon: Route,
+    title: "我们让模型接力",
+    text: "文字模型先写故事和小百科，图片模型再画每页插图，语音模型最后朗读绘本，就像三段接力把作品做完整。"
+  },
+  {
+    icon: ShieldCheck,
+    title: "我们做了兜底",
+    text: "如果模型暂时失败，系统会用本地演示内容、占位插图或浏览器朗读先接住，比赛展示时页面不容易空白。"
+  }
+];
+
+const aboutWorkflow = [
+  "我们先输入一句广西故事灵感",
+  "桂小灵提取地点、人物、动作和文化线索",
+  "AI 整理成 4 页绘本故事与文化小百科",
+  "系统为每页生成插图提示词并绘制画面",
+  "作品保存到书架，我们进入剧场朗读展示"
+];
+
+function ProjectAboutPage({ onStartCreate, onGoToShelf }: { onStartCreate: () => void; onGoToShelf: () => void }) {
+  return (
+    <section className="about-page" aria-label="项目介绍">
+      <div className="about-hero">
+        <div className="about-hero-copy">
+          <p className="product-eyebrow">项目介绍</p>
+          <h2>我们三个小朋友和 AI 一起做出的“桂韵创想家”</h2>
+          <p>
+            我们做这个项目，是想让小朋友从一句自己的灵感出发，在 AI 的陪伴下完成故事构思、广西文化选择、绘本分镜、插图生成、朗读展示和作品保存。它强调的不是“AI 替我们写完”，而是“我们提出想法，AI 引导我们思考，我们一起把想法做成作品”。
+          </p>
+          <div className="about-hero-actions">
+            <button className="strong-button" type="button" onClick={onStartCreate}>
+              <Plus size={17} />
+              开始创作
+            </button>
+            <button className="soft-button" type="button" onClick={onGoToShelf}>
+              <BookOpen size={17} />
+              查看书架
+            </button>
+          </div>
+        </div>
+        <div className="about-hero-card" aria-label="项目能力概览">
+          <span>
+            <BookOpen size={22} />
+            4 页绘本
+          </span>
+          <span>
+            <ImageIcon size={22} />
+            AI 插图
+          </span>
+          <span>
+            <Volume2 size={22} />
+            绘本朗读
+          </span>
+          <span>
+            <FileText size={22} />
+            创作记录
+          </span>
+        </div>
+      </div>
+
+      <section className="about-theme-section" aria-labelledby="about-business-title">
+        <div className="about-theme-head">
+          <span>01</span>
+          <div>
+            <p className="product-eyebrow">业务介绍</p>
+            <h3 id="about-business-title">我们想让更多小朋友用绘本介绍广西</h3>
+          </div>
+        </div>
+        <div className="about-section-grid">
+          {aboutBusinessCards.map((item) => {
+            const Icon = item.icon;
+            return (
+              <article className="about-principle-card" key={item.title}>
+                <span aria-hidden="true">
+                  <Icon size={22} />
+                </span>
+                <h4>{item.title}</h4>
+                <p>{item.text}</p>
+              </article>
+            );
+          })}
+        </div>
+
+        <div className="about-detail-layout">
+          <section className="about-panel">
+            <div className="mini-head">
+              <div>
+                <p className="product-eyebrow">创作原理</p>
+                <h3>从“我们的表达”到“可展示作品”</h3>
+              </div>
+              <Route size={22} />
+            </div>
+            <ol className="about-flow-list">
+              {aboutWorkflow.map((step, index) => (
+                <li key={step}>
+                  <span>{String(index + 1).padStart(2, "0")}</span>
+                  {step}
+                </li>
+              ))}
+            </ol>
+          </section>
+
+          <section className="about-panel">
+            <div className="mini-head">
+              <div>
+                <p className="product-eyebrow">设计构想</p>
+                <h3>把比赛演示、真实学习和家乡文化放在一起</h3>
+              </div>
+              <Cpu size={22} />
+            </div>
+            <div className="about-copy-stack">
+              <p>从业务上看，我们把“写作练习、家乡文化表达、比赛展示”合成一条完整路线：先说出灵感，再和 AI 共创，最后形成可以朗读和展示的绘本作品。</p>
+              <p>系统会优先保留我们输入里的具体地点、食物、节日、活动和心情，再把合适的广西非遗、文旅、美食与山水元素织进故事。</p>
+              <p>创作记录页面会展示故事提示词、插图提示词、输出结果和系统记录，让评委能看见 AI 如何参与，也能看见我们自己的创作起点。</p>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section className="about-theme-section" aria-labelledby="about-tech-title">
+        <div className="about-theme-head">
+          <span>02</span>
+          <div>
+            <p className="product-eyebrow">技术实现</p>
+            <h3 id="about-tech-title">我们怎样把想法做成可以运行的软件</h3>
+          </div>
+        </div>
+        <div className="about-section-grid about-tech-grid">
+          {aboutTechCards.map((item) => {
+            const Icon = item.icon;
+            return (
+              <article className="about-principle-card tech" key={item.title}>
+                <span aria-hidden="true">
+                  <Icon size={22} />
+                </span>
+                <h4>{item.title}</h4>
+                <p>{item.text}</p>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+    </section>
   );
 }
 
@@ -1206,6 +1420,7 @@ function ReaderWorkspace({
   }
 
   const language = activeBook.language || "zh";
+  const cultureNoteLabel = getCultureNoteLabel(language);
   const taskStatus = selectedPage ? imageTasks?.[selectedPage.pageNumber] || "idle" : "idle";
   const isReadingFullBook = readingMode === "book";
   const isReadingCurrentPage = readingMode === "page" && readingPageNumber === selectedPage?.pageNumber;
@@ -1260,7 +1475,7 @@ function ReaderWorkspace({
               <h3>{selectedPage.title}</h3>
               <p>{selectedPage.text}</p>
               <div className="culture-card">
-                <strong>广西文化小百科</strong>
+                <strong>{cultureNoteLabel}</strong>
                 <span>{selectedPage.cultureNote}</span>
               </div>
               <div className="reader-actions">
@@ -1317,6 +1532,7 @@ function RecordsLibrary({
   const systemRecords = records.filter((record) => record.type === "system");
   const [activeRecordTab, setActiveRecordTab] = useState<RecordTabKey>("story");
   const [activeRecordPage, setActiveRecordPage] = useState(1);
+  const cultureNoteLabel = getCultureNoteLabel(activeBook?.language || "zh");
   const recordTabs: Array<{ key: RecordTabKey; label: string; count: number; unit: string }> = activeBook
     ? [
         { key: "story", label: "故事提示词", count: storyRecords.length, unit: "条" },
@@ -1471,7 +1687,7 @@ function RecordsLibrary({
                             <pre>{selectedStoryPage.imagePrompt}</pre>
                           </div>
                           <div className="prompt-block">
-                            <span>文化小百科</span>
+                            <span>{cultureNoteLabel}</span>
                             <pre>{selectedStoryPage.cultureNote}</pre>
                           </div>
                         </article>

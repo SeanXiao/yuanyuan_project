@@ -362,8 +362,8 @@ function protagonistVisualSpec(language: BookLanguage, gender: ProtagonistGender
   }
 
   return gender === "boy"
-    ? "小学生主角设定：一位 8-10 岁广西小学生男孩，明亮眼睛、友好表情，穿红蓝相间、带少量广西民族纹样点缀的小外套，背一个小书包。"
-    : "小学生主角设定：一位 8-10 岁广西小学生女孩，明亮眼睛、友好表情，穿红蓝相间、带少量广西民族纹样点缀的小外套，背一个小书包。";
+    ? "小学生主角设定：一位八到十岁广西小学生男孩，明亮眼睛、友好表情，穿红蓝相间、带少量广西民族纹样点缀的小外套，背一个小书包。"
+    : "小学生主角设定：一位八到十岁广西小学生女孩，明亮眼睛、友好表情，穿红蓝相间、带少量广西民族纹样点缀的小外套，背一个小书包。";
 }
 
 function makeIllustrationPrompt(
@@ -381,7 +381,7 @@ function makeIllustrationPrompt(
           "If the scene contains a sign, plaque, book, paper, banner, monument, or display board, render it blank, decorative, or unreadable."
         ].join(" ")
       : [
-          "画面无可读文字：不要画汉字、英文、拼音、数字、标点、字幕、对白气泡、标签、招牌、牌匾、横幅、页码、水印、Logo、界面文字、书页文字、纸条、展板、纪念碑文字或任何可读符号。",
+          "画面无可读文字：不要画汉字、英文、拼音、数字、标点、字幕、对白气泡、标签、招牌、牌匾、横幅、页码、水印、标识、界面文字、书页文字、纸条、展板、纪念碑文字或任何可读符号。",
           "如果场景包含招牌、牌匾、书本、纸张、横幅、纪念碑或展板，请画成空白、装饰纹理或不可读纹理。"
         ].join(" ");
 
@@ -400,7 +400,7 @@ function makeIllustrationPrompt(
   }
 
   return [
-    "儿童绘本插图，温暖明亮的水彩风格，小学生主角，画面适合 6-12 岁儿童。",
+    "儿童绘本插图，温暖明亮的水彩风格，小学生主角，画面适合六到十二岁儿童。",
     protagonistVisualSpec(language, protagonistGender),
     guiXiaolingVisualSpec(language),
     "本页视觉概念：一个适合儿童绘本的广西场景，不提供可写进画面的标题。",
@@ -614,7 +614,7 @@ export function createFallbackBook(idea: string, language: BookLanguage = "zh", 
     aiContentRatio: 88,
     promptRecords: [
       makePromptRecord("story", "桂韵创想家 核心提示词", storyPrompt, "已生成 4 页绘本故事、大纲、文旅讲解和文化小百科。"),
-      ...pages.map((page) => makePromptRecord("image", `第 ${page.pageNumber} 页图片 Prompt`, page.imagePrompt, "等待图片生成或使用本地演示插图。"))
+      ...pages.map((page) => makePromptRecord("image", `第 ${page.pageNumber} 页图片提示词`, page.imagePrompt, "等待图片生成或使用本地演示插图。"))
     ]
   };
 }

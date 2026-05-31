@@ -21,6 +21,8 @@ export type PictureBookPage = {
   cultureNote: string;
   speechAudioUrl?: string;
   speechAudioText?: string;
+  speechAudioVoice?: string;
+  speechAudioLanguage?: BookLanguage;
 };
 
 export type PictureBook = {

@@ -3,7 +3,7 @@ import { access, mkdir, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
-import type { ProtagonistGender } from "./bookStore.js";
+import type { BookLanguage, ProtagonistGender } from "./bookStore.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const generatedDir = join(rootDir, "data", "generated");
@@ -16,25 +16,33 @@ function ttsModel() {
   return process.env.BAILIAN_TTS_MODEL || "cosyvoice-v3-flash";
 }
 
-function ttsVoice(gender: ProtagonistGender = "girl") {
+export function getBailianTtsVoice(gender: ProtagonistGender = "girl", language: BookLanguage = "zh") {
+  if (language === "en") {
+    if (gender === "boy") {
+      return process.env.BAILIAN_TTS_EN_BOY_VOICE || "longshu_v3";
+    }
+    return process.env.BAILIAN_TTS_EN_GIRL_VOICE || "longmiao_v3";
+  }
+
   if (gender === "boy") {
     return process.env.BAILIAN_TTS_BOY_VOICE || "longjielidou_v3";
   }
   return process.env.BAILIAN_TTS_GIRL_VOICE || "longling_v3";
 }
 
-function humanizeForSpeech(text: string) {
+function humanizeForSpeech(text: string, language: BookLanguage) {
   return text
     .replace(/[*_`#>-]/gu, "")
-    .replace(/\n+/gu, "。")
+    .replace(/\n+/gu, language === "en" ? ". " : "。")
     .replace(/\s+/gu, " ")
     .trim()
     .slice(0, 1800);
 }
 
-function getSpeechFileName(text: string, voice: string) {
+function getSpeechFileName(text: string, voice: string, language: BookLanguage) {
+  const cacheParts = language === "en" ? [ttsModel(), voice, language, text] : [ttsModel(), voice, text];
   const hash = createHash("sha256")
-    .update([ttsModel(), voice, text].join("\n"))
+    .update(cacheParts.join("\n"))
     .digest("hex")
     .slice(0, 28);
   return `speech-${hash}.mp3`;
@@ -51,24 +59,26 @@ type BailianTtsMessage = {
 export function getBailianTtsStatus() {
   return {
     ttsModel: ttsModel(),
-    girlVoice: ttsVoice("girl"),
-    boyVoice: ttsVoice("boy")
+    girlVoice: getBailianTtsVoice("girl", "zh"),
+    boyVoice: getBailianTtsVoice("boy", "zh"),
+    englishGirlVoice: getBailianTtsVoice("girl", "en"),
+    englishBoyVoice: getBailianTtsVoice("boy", "en")
   };
 }
 
-export async function synthesizeBailianSpeech(text: string, gender: ProtagonistGender = "girl") {
+export async function synthesizeBailianSpeech(text: string, gender: ProtagonistGender = "girl", language: BookLanguage = "zh") {
   const apiKey = dashScopeKey();
   if (!apiKey) {
     throw new Error("DASHSCOPE_API_KEY is missing");
   }
 
-  const safeText = humanizeForSpeech(text);
+  const safeText = humanizeForSpeech(text, language);
   if (!safeText) {
     throw new Error("speech text is empty");
   }
 
-  const voice = ttsVoice(gender);
-  const fileName = getSpeechFileName(safeText, voice);
+  const voice = getBailianTtsVoice(gender, language);
+  const fileName = getSpeechFileName(safeText, voice, language);
   const filePath = join(generatedDir, fileName);
   try {
     const fileStat = await stat(filePath);
@@ -78,6 +88,7 @@ export async function synthesizeBailianSpeech(text: string, gender: ProtagonistG
       length: fileStat.size,
       model: ttsModel(),
       voice,
+      language,
       cached: true
     };
   } catch {
@@ -137,8 +148,9 @@ export async function synthesizeBailianSpeech(text: string, gender: ProtagonistG
             format: "mp3",
             sample_rate: 24000,
             volume: 50,
-            rate: 1,
-            pitch: 1
+            rate: language === "en" ? 0.92 : 1,
+            pitch: 1,
+            ...(language === "en" ? { language_hints: ["en"] } : {})
           }
         }
       });
@@ -206,6 +218,7 @@ export async function synthesizeBailianSpeech(text: string, gender: ProtagonistG
     length: audio.length,
     model: ttsModel(),
     voice,
+    language,
     cached: false
   };
 }

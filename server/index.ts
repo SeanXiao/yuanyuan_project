@@ -9,7 +9,7 @@ import {
   generateSeasonalInspirationChips,
   getBailianRuntimeStatus
 } from "./bailian.js";
-import { synthesizeBailianSpeech } from "./bailianTts.js";
+import { getBailianTtsVoice, synthesizeBailianSpeech } from "./bailianTts.js";
 import {
   deleteBook,
   getBook,
@@ -58,32 +58,36 @@ function buildPageSpeechText(book: PictureBook, page: PictureBookPage, includeCu
 }
 
 async function preloadPictureBookSpeech(book: PictureBook) {
-  if ((book.language || "zh") !== "zh") {
-    return book;
-  }
-
+  const language = book.language || "zh";
   const protagonistGender = book.protagonistGender || "girl";
+  const expectedVoice = getBailianTtsVoice(protagonistGender, language);
   const titleText = cleanSpeechPart(book.title);
   const titleWarmup = titleText
-    ? synthesizeBailianSpeech(titleText, protagonistGender).catch(() => null)
+    ? synthesizeBailianSpeech(titleText, protagonistGender, language).catch(() => null)
     : Promise.resolve(null);
 
   const pageResults = await Promise.allSettled(
     book.pages.map(async (page) => {
       const speechAudioText = buildPageSpeechText(book, page, true);
-      if (page.speechAudioUrl && page.speechAudioText === speechAudioText) {
+      const hasCurrentVoice = page.speechAudioVoice === expectedVoice && page.speechAudioLanguage === language;
+      const canReuseLegacyChineseVoice = language === "zh" && !page.speechAudioVoice && !page.speechAudioLanguage;
+      if (page.speechAudioUrl && page.speechAudioText === speechAudioText && (hasCurrentVoice || canReuseLegacyChineseVoice)) {
         return {
           pageNumber: page.pageNumber,
           speechAudioText,
-          speechAudioUrl: page.speechAudioUrl
+          speechAudioUrl: page.speechAudioUrl,
+          speechAudioVoice: page.speechAudioVoice || expectedVoice,
+          speechAudioLanguage: page.speechAudioLanguage || language
         };
       }
 
-      const audio = await synthesizeBailianSpeech(speechAudioText, protagonistGender);
+      const audio = await synthesizeBailianSpeech(speechAudioText, protagonistGender, language);
       return {
         pageNumber: page.pageNumber,
         speechAudioText,
-        speechAudioUrl: audio.audioUrl
+        speechAudioUrl: audio.audioUrl,
+        speechAudioVoice: audio.voice,
+        speechAudioLanguage: language
       };
     })
   );
@@ -91,7 +95,17 @@ async function preloadPictureBookSpeech(book: PictureBook) {
 
   const speechByPage = new Map(
     pageResults
-      .filter((result): result is PromiseFulfilledResult<{ pageNumber: number; speechAudioText: string; speechAudioUrl: string }> => result.status === "fulfilled")
+      .filter(
+        (
+          result
+        ): result is PromiseFulfilledResult<{
+          pageNumber: number;
+          speechAudioText: string;
+          speechAudioUrl: string;
+          speechAudioVoice: string;
+          speechAudioLanguage: NonNullable<PictureBook["language"]>;
+        }> => result.status === "fulfilled"
+      )
       .map((result) => [result.value.pageNumber, result.value])
   );
 
@@ -105,11 +119,13 @@ async function preloadPictureBookSpeech(book: PictureBook) {
       pages: currentBook.pages.map((page) => {
         const speech = speechByPage.get(page.pageNumber);
         return speech
-          ? {
-              ...page,
-              speechAudioText: speech.speechAudioText,
-              speechAudioUrl: speech.speechAudioUrl
-            }
+            ? {
+                ...page,
+                speechAudioText: speech.speechAudioText,
+                speechAudioUrl: speech.speechAudioUrl,
+                speechAudioVoice: speech.speechAudioVoice,
+                speechAudioLanguage: speech.speechAudioLanguage
+              }
           : page;
       })
     }))) || book
@@ -128,12 +144,13 @@ app.post("/api/speech", async (request, response, next) => {
   try {
     const text = String(request.body?.text || "").trim();
     const protagonistGender = request.body?.protagonistGender === "boy" ? "boy" : "girl";
+    const language = request.body?.language === "en" ? "en" : "zh";
     if (!text) {
       response.status(400).json({ error: "text is required" });
       return;
     }
 
-    const audio = await synthesizeBailianSpeech(text, protagonistGender);
+    const audio = await synthesizeBailianSpeech(text, protagonistGender, language);
     response.json(audio);
   } catch (error) {
     next(error);
@@ -295,7 +312,9 @@ app.post("/api/picture-books/:id/pages/:pageNumber/image", async (request, respo
             ? {
                 ...result.page,
                 speechAudioText: page.speechAudioText || result.page.speechAudioText,
-                speechAudioUrl: page.speechAudioUrl || result.page.speechAudioUrl
+                speechAudioUrl: page.speechAudioUrl || result.page.speechAudioUrl,
+                speechAudioVoice: page.speechAudioVoice || result.page.speechAudioVoice,
+                speechAudioLanguage: page.speechAudioLanguage || result.page.speechAudioLanguage
               }
             : page
         ),
