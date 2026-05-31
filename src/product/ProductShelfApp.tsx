@@ -43,7 +43,7 @@ import type { BookLanguage, PictureBook, PictureBookPage, PictureBookSummary, Pr
 type ProductView = "shelf" | "desk" | "detail" | "records" | "theater" | "about";
 type ImageTaskStatus = "idle" | "running" | "done" | "error";
 type ProductStage = "input" | "analysis" | "content" | "images" | "saved";
-type RecordTabKey = "story" | "pages" | "images" | "system" | "culture";
+type RecordTabKey = "story" | "pages" | "images";
 type PromptContentTabKey = "prompt" | "output";
 type ReadingMode = "idle" | "page" | "book";
 
@@ -176,6 +176,10 @@ function getPromptRecordPreviewImageUrl(record: PromptRecord, pages: PictureBook
 
   const pageNumber = getPromptRecordPageNumber(record);
   return pages.find((page) => page.pageNumber === pageNumber)?.imageUrl || "";
+}
+
+function isGeneratedImageRecord(record: PromptRecord) {
+  return Boolean(extractImageSource(record.output));
 }
 
 function cleanSpeechPart(text = "") {
@@ -1126,7 +1130,7 @@ function ProjectAboutPage({ onStartCreate, onGoToShelf }: { onStartCreate: () =>
             <div className="about-copy-stack">
               <p>从业务上看，我们把“写作练习、家乡文化表达、比赛展示”合成一条完整路线：先说出灵感，再和 AI 共创，最后形成可以朗读和展示的绘本作品。</p>
               <p>系统会优先保留我们输入里的具体地点、食物、节日、活动和心情，再把合适的广西非遗、文旅、美食与山水元素织进故事。</p>
-              <p>创作记录页面会展示故事提示词、插图提示词、输出结果和系统记录，让评委能看见 AI 如何参与，也能看见我们自己的创作起点。</p>
+              <p>创作记录页面会展示故事提示词、每页故事输出和实际插图生成结果，让评委能看见 AI 如何参与，也能看见我们自己的创作起点。</p>
             </div>
           </section>
         </div>
@@ -1527,21 +1531,17 @@ function RecordsLibrary({
 }) {
   const records = activeBook?.promptRecords || [];
   const storyRecords = records.filter((record) => record.type === "story");
-  const imageRecords = records.filter((record) => record.type === "image");
-  const cultureRecords = records.filter((record) => record.type === "culture");
-  const systemRecords = records.filter((record) => record.type === "system");
+  const imageRecords = records.filter((record) => record.type === "image" && isGeneratedImageRecord(record));
   const [activeRecordTab, setActiveRecordTab] = useState<RecordTabKey>("story");
   const [activeRecordPage, setActiveRecordPage] = useState(1);
   const cultureNoteLabel = getCultureNoteLabel(activeBook?.language || "zh");
   const recordTabs: Array<{ key: RecordTabKey; label: string; count: number; unit: string }> = activeBook
-    ? [
-        { key: "story", label: "故事提示词", count: storyRecords.length, unit: "条" },
-        { key: "pages", label: "故事输出", count: activeBook.pages.length, unit: "页" },
-        { key: "images", label: "插图记录", count: imageRecords.length, unit: "条" },
-        { key: "system", label: "系统记录", count: systemRecords.length, unit: "条" },
-        { key: "culture", label: "文化讲解", count: cultureRecords.length, unit: "条" }
-      ]
-    : [];
+      ? [
+          { key: "story", label: "故事提示词", count: storyRecords.length, unit: "条" },
+          { key: "pages", label: "故事输出", count: activeBook.pages.length, unit: "页" },
+          { key: "images", label: "插图记录", count: imageRecords.length, unit: "条" }
+        ]
+      : [];
   const selectedStoryPage = activeBook?.pages.find((page) => page.pageNumber === activeRecordPage) || activeBook?.pages[0];
 
   useEffect(() => {
@@ -1555,7 +1555,7 @@ function RecordsLibrary({
         <div>
           <p className="product-eyebrow">创作记录</p>
           <h2>核心提示词和故事输出</h2>
-          <span>{activeBook ? `正在查看《${activeBook.title}》，共 ${records.length} 条记录` : "选择一本绘本查看完整提示词记录"}</span>
+          <span>{activeBook ? `正在查看《${activeBook.title}》，可查看故事提示词、故事输出和插图生成记录` : "选择一本绘本查看完整提示词记录"}</span>
         </div>
         <div className="section-actions">
           <button className="soft-button" type="button" onClick={() => activeBook && onOpenBook(activeBook.id)} disabled={!activeBook}>
@@ -1701,15 +1701,13 @@ function RecordsLibrary({
                   ) : null}
 
                   {activeRecordTab === "images" ? (
-                    <PromptGroup title="各次插图生成提示词" description="每页初始图片 Prompt、重画 Prompt 和实际图片生成记录。" records={imageRecords} imagePreviewPages={activeBook.pages} />
-                  ) : null}
-
-                  {activeRecordTab === "system" ? (
-                    <PromptGroup title="系统与核心记录" description="包括模型调用失败、备用生成等系统层记录。" records={systemRecords} emptyText="这本绘本没有额外系统记录。" />
-                  ) : null}
-
-                  {activeRecordTab === "culture" ? (
-                    <PromptGroup title="文化与讲解记录" description="小百科、讲解词和其他文化说明相关记录。" records={cultureRecords} emptyText="这本绘本没有单独的文化记录。" />
+                    <PromptGroup
+                      title="插图生成记录"
+                      description="只显示实际生成图片的记录；每页插图提示词可以在“故事输出”里查看。"
+                      records={imageRecords}
+                      imagePreviewPages={activeBook.pages}
+                      emptyText="这本绘本还没有实际生成过插图。"
+                    />
                   ) : null}
                 </div>
               </section>

@@ -243,7 +243,7 @@ async function main() {
     });
     await client.waitFor(() => {
       const text = document.body.innerText;
-      return Boolean(document.querySelector(".records-page")) && text.includes("核心创建故事提示词") && document.querySelectorAll(".record-tab-button").length >= 5 ? true : null;
+      return Boolean(document.querySelector(".records-page")) && text.includes("核心创建故事提示词") && document.querySelectorAll(".record-tab-button").length === 3 ? true : null;
     }, null, 30000);
     await client.evaluate(() => {
       [...document.querySelectorAll(".record-tab-button")].find((button) => button.textContent.includes("故事输出"))?.click();

@@ -175,7 +175,7 @@ async function main() {
       const openBook = Boolean(document.querySelector(".open-book"));
       return openBook
         ? {
-            page: document.querySelector(".page-number-pill")?.textContent || "",
+            activePage: document.querySelector(".page-strip button.active")?.textContent || "",
             pageButtons: document.querySelectorAll(".page-strip button").length,
             hash: location.hash,
             openBook
@@ -187,20 +187,20 @@ async function main() {
     assert(reader.pageButtons >= 4, "reader has page strip");
 
     await client.evaluate(() => {
-      document.querySelector(".page-turn.right")?.click();
+      document.querySelectorAll(".page-strip button")[1]?.click();
       return true;
     });
-    await client.waitFor(() => document.querySelector(".page-number-pill")?.textContent?.includes("2"));
+    await client.waitFor(() => document.querySelector(".page-strip button.active")?.textContent?.includes("2"));
     pass("next page button works");
     await client.evaluate(() => {
-      document.querySelector(".page-turn.left")?.click();
+      document.querySelectorAll(".page-strip button")[0]?.click();
       return true;
     });
-    await client.waitFor(() => /1/.test(document.querySelector(".page-number-pill")?.textContent || ""));
+    await client.waitFor(() => /1/.test(document.querySelector(".page-strip button.active")?.textContent || ""));
     pass("previous page button works");
 
     await client.evaluate(() => {
-      [...document.querySelectorAll(".product-nav button")].find((button) => button.textContent.includes("创作记录"))?.click();
+      [...document.querySelectorAll("button")].find((button) => button.textContent.includes("创作记录"))?.click();
       return true;
     });
     const records = await client.waitFor(() => {
@@ -210,12 +210,14 @@ async function main() {
       const recordTabs = document.querySelectorAll(".record-tab-button").length;
       return section ? { hash: location.hash, recordTabs, storyButtons, text } : null;
     });
-    assert(records.hash === "#/records", "records has top level route");
+    assert(records.hash === "#/records" || /^#\/book\/[^/]+\/records$/u.test(records.hash), "records has a records route");
     assert(records.storyButtons > 1, "records page can choose different stories");
-    assert(records.recordTabs >= 5, "records page groups prompts in tabs");
+    assert(records.recordTabs === 3, "records page shows the focused prompt tabs");
+    assert(!records.text.includes("系统记录") && !records.text.includes("文化讲解"), "records page hides internal-only tabs");
     assert(records.text.includes("核心创建故事提示词"), "records page shows core prompt tab by default");
     await client.evaluate(() => {
-      [...document.querySelectorAll(".record-tab-button")].find((button) => button.textContent.includes("故事输出"))?.click();
+      const tab = [...document.querySelectorAll(".record-tab-button")].find((button) => button.textContent.includes("故事输出"));
+      tab?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
       return true;
     });
     await client.waitFor(() => document.body.innerText.includes("各页故事与插图提示词") && document.querySelectorAll(".record-page-tab").length >= 4);
@@ -232,7 +234,7 @@ async function main() {
     pass("records story selector changes route");
 
     await client.evaluate(() => {
-      [...document.querySelectorAll(".product-nav button")].find((button) => button.textContent.includes("绘本剧场"))?.click();
+      [...document.querySelectorAll("button")].find((button) => button.textContent.includes("进入剧场"))?.click();
       return true;
     });
     await client.waitFor(() => Boolean(document.querySelector(".theater-workspace")) && /\/theater$/u.test(location.hash));
@@ -245,9 +247,10 @@ async function main() {
     pass("theater reading mode toggles");
 
     await client.evaluate(() => {
-      [...document.querySelectorAll(".product-nav button")].find((button) => button.textContent.includes("我的书架"))?.click();
+      [...document.querySelectorAll("button")].find((button) => button.textContent.includes("返回书架"))?.click();
       return true;
     });
+    await client.waitFor(() => Boolean(document.querySelector(".product-shelf-grid")));
     await client.evaluate(() => {
       document.querySelector(".cover-delete")?.click();
       return true;
@@ -292,7 +295,7 @@ async function main() {
       location.hash = "#/classic";
       return true;
     });
-    await client.waitFor(() => document.body.innerText.includes("桂韵创想家"));
+    await client.waitFor(() => document.body.innerText.includes("桂小雅绘本工坊"));
     pass("classic interface remains reachable");
 
     await client.send("Emulation.setDeviceMetricsOverride", { deviceScaleFactor: 1, height: 960, mobile: true, width: 390 });
