@@ -8,3 +8,4 @@ data/generated/
 data/sessions/
 *.log
 .DS_Store
+ssh/
