@@ -15,10 +15,9 @@
 }
 
 .product-header,
-.product-notice,
-.flow-board,
 .product-shelf-grid,
 .product-workspace,
+.records-page,
 .theater-workspace {
   width: min(1540px, 100%);
   margin: 0 auto;
@@ -163,134 +162,60 @@
   box-shadow: 0 10px 20px rgba(170, 69, 47, 0.18);
 }
 
-.product-notice {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  min-height: 48px;
-  margin-top: 12px;
-  padding: 0 16px;
-  border: 1px solid rgba(119, 170, 128, 0.24);
-  border-radius: 20px;
-  color: #243d36;
-  background: #eaf7ef;
-  font-weight: 850;
-}
-
-.product-notice a {
-  margin-left: auto;
-  color: #356f59;
-  font-size: 0.86rem;
-  font-weight: 900;
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.flow-board {
-  display: grid;
-  grid-template-columns: repeat(9, minmax(118px, 1fr));
-  gap: 10px;
-  margin-top: 12px;
-  overflow-x: auto;
-  padding-bottom: 2px;
-}
-
-.flow-step {
-  position: relative;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 8px;
-  min-height: 82px;
-  padding: 12px;
-  border: 1px solid rgba(151, 130, 92, 0.16);
-  border-radius: 20px;
-  background: rgba(255, 253, 247, 0.9);
-  box-shadow: 0 8px 18px rgba(77, 62, 38, 0.06);
-}
-
-.flow-step::after {
-  position: absolute;
-  top: 50%;
-  right: -9px;
-  z-index: 1;
-  width: 8px;
-  height: 2px;
-  background: rgba(61, 119, 184, 0.52);
-  content: "";
-}
-
-.flow-step:last-child::after {
-  display: none;
-}
-
-.flow-step > span {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  place-items: center;
-  border-radius: 50%;
-  color: #fffdf7;
-  background: #4f9f68;
-  font-size: 1rem;
-  font-weight: 950;
-}
-
-.flow-step strong {
-  display: block;
-  color: #243d36;
-  line-height: 1.2;
-}
-
-.flow-step p {
-  margin: 3px 0 0;
-  color: #667771;
-  font-size: 0.72rem;
-  font-weight: 850;
-  line-height: 1.35;
-}
-
-.flow-step svg {
-  position: absolute;
-  right: 10px;
-  bottom: 10px;
-  color: #4f9f68;
-}
-
-.flow-step-2 > span,
-.flow-step-6 > span {
-  background: #4b91d1;
-}
-
-.flow-step-3 > span,
-.flow-step-9 > span {
-  background: #7356b8;
-}
-
-.flow-step-4 > span,
-.flow-step-7 > span {
-  background: #d27a28;
-}
-
-.flow-step-8 > span {
-  background: #cf6477;
-}
-
-.flow-step.active {
-  border-color: rgba(193, 120, 32, 0.42);
-  background: #fff8df;
-  box-shadow: 0 14px 28px rgba(193, 120, 32, 0.15);
-}
-
-.flow-step.done {
-  border-color: rgba(119, 170, 128, 0.34);
-  background: #f1faf5;
-}
-
 .product-shelf-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(340px, 420px);
   gap: 16px;
   margin-top: 16px;
+}
+
+.product-shelf-grid.bookshelf-only {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.product-shelf-grid.bookshelf-only .creation-panel {
+  display: none;
+}
+
+.product-shelf-grid.desk-only {
+  grid-template-columns: minmax(340px, 430px) minmax(0, 1fr);
+}
+
+.product-shelf-grid.desk-only .bookshelf-panel {
+  display: none;
+}
+
+.desk-stage {
+  display: grid;
+  min-height: 520px;
+  place-items: center;
+  border: 1px solid rgba(151, 130, 92, 0.16);
+  border-radius: 26px;
+  background: rgba(255, 253, 247, 0.92);
+  box-shadow: 0 16px 34px rgba(77, 62, 38, 0.09);
+}
+
+.desk-empty {
+  display: grid;
+  max-width: 560px;
+  place-items: center;
+  gap: 14px;
+  padding: 28px;
+  color: #667771;
+  text-align: center;
+}
+
+.desk-empty h2 {
+  margin: 0;
+  color: #243d36;
+  font-size: clamp(1.5rem, 3vw, 2.3rem);
+}
+
+.desk-empty p {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 850;
+  line-height: 1.7;
 }
 
 .bookshelf-panel,
@@ -438,6 +363,20 @@
 .cover-delete:hover {
   color: #aa452f;
   background: #fff1ea;
+}
+
+.cover-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+
+.cover-actions .soft-button,
+.cover-actions .strong-button {
+  min-height: 36px;
+  padding: 0 10px;
+  font-size: 0.78rem;
 }
 
 .empty-bookshelf,
@@ -761,10 +700,26 @@
 
 .product-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
-  margin-top: 16px;
+  margin-top: 0;
   align-items: start;
+}
+
+.product-classic-desk {
+  width: min(1540px, 100%);
+  margin: 16px auto 0;
+}
+
+.product-classic-desk .app-shell {
+  min-height: auto;
+  padding: 0;
+  background: transparent;
+}
+
+.product-classic-desk .studio-layout {
+  width: min(1340px, 100%);
+  min-height: calc(100vh - 170px);
 }
 
 .reader-workspace {
@@ -775,12 +730,20 @@
   border-color: rgba(79, 145, 209, 0.34);
 }
 
+.reader-book-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 112px;
+  align-items: stretch;
+  gap: 12px;
+  margin-top: 16px;
+}
+
 .open-book {
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 0.86fr);
   gap: 0;
-  margin-top: 16px;
+  min-height: clamp(500px, calc(100vh - 188px), 760px);
   padding: 14px;
   border: 1px solid rgba(151, 130, 92, 0.16);
   border-radius: 28px;
@@ -823,7 +786,7 @@
 .image-page img {
   width: min(100%, 720px);
   height: 100%;
-  max-height: 430px;
+  max-height: 600px;
   display: block;
   object-fit: contain;
   border-radius: 10px;
@@ -915,28 +878,29 @@
 }
 
 .page-strip {
-  display: flex;
+  display: grid;
+  align-content: start;
   gap: 8px;
-  overflow-x: auto;
-  margin-top: 12px;
-  padding-bottom: 2px;
+  overflow-y: auto;
+  max-height: clamp(500px, calc(100vh - 188px), 760px);
+  padding-right: 2px;
 }
 
 .page-strip button {
   display: grid;
-  grid-template-columns: 48px minmax(58px, 1fr);
+  grid-template-columns: 1fr;
   gap: 8px;
-  align-items: center;
-  min-width: 150px;
-  min-height: 58px;
+  align-items: start;
+  min-width: 0;
+  min-height: 104px;
   border: 1px solid rgba(151, 130, 92, 0.16);
   border-radius: 16px;
-  padding: 6px;
+  padding: 7px;
   color: #243d36;
   background: #fffdf7;
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-weight: 900;
-  text-align: left;
+  text-align: center;
 }
 
 .page-strip button.active {
@@ -945,8 +909,8 @@
 }
 
 .page-strip img {
-  width: 48px;
-  height: 42px;
+  width: 100%;
+  height: 62px;
   object-fit: cover;
   border-radius: 10px;
 }
@@ -1030,8 +994,269 @@
   font-size: 0.78rem;
 }
 
-.theater-workspace {
+.records-page {
+  display: grid;
+  gap: 16px;
   margin-top: 16px;
+  padding: 18px;
+  border: 1px solid rgba(151, 130, 92, 0.16);
+  border-radius: 26px;
+  background: rgba(255, 253, 247, 0.92);
+  box-shadow: 0 16px 34px rgba(77, 62, 38, 0.09);
+}
+
+.records-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.record-book-selector,
+.record-detail-panel,
+.record-book-summary,
+.prompt-group,
+.story-output-panel {
+  border: 1px solid rgba(151, 130, 92, 0.16);
+  border-radius: 22px;
+  background: #fffdf7;
+}
+
+.record-book-selector,
+.record-detail-panel,
+.record-book-summary,
+.prompt-group,
+.story-output-panel {
+  padding: 14px;
+}
+
+.record-book-selector {
+  position: sticky;
+  top: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.record-book-selector h3,
+.record-book-summary h3,
+.prompt-group h3,
+.story-output-panel h3 {
+  margin: 0;
+  color: #243d36;
+}
+
+.record-story-list,
+.record-detail-panel,
+.prompt-card-list {
+  display: grid;
+  gap: 10px;
+}
+
+.record-story-list {
+  max-height: 760px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.record-story-button {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  border: 1px solid rgba(151, 130, 92, 0.16);
+  border-radius: 18px;
+  padding: 8px;
+  color: #243d36;
+  background: #fffbf0;
+  text-align: left;
+}
+
+.record-story-button.active {
+  border-color: rgba(79, 159, 104, 0.48);
+  background: #eaf7ef;
+  box-shadow: inset 4px 0 0 #4f9f68;
+}
+
+.record-story-button img,
+.record-story-button > svg {
+  width: 58px;
+  height: 48px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: #fff8df;
+}
+
+.record-story-button > span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.record-story-button strong,
+.record-story-button em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.record-story-button strong {
+  font-size: 0.9rem;
+}
+
+.record-story-button small,
+.record-story-button em {
+  color: #667771;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.record-story-button small {
+  color: #8c6a37;
+  font-size: 0.75rem;
+}
+
+.record-story-button em {
+  font-size: 0.76rem;
+}
+
+.record-book-summary {
+  display: grid;
+  gap: 12px;
+  background:
+    linear-gradient(145deg, #eaf7ef, #fff8df),
+    repeating-linear-gradient(135deg, rgba(119, 170, 128, 0.05) 0 10px, transparent 10px 22px);
+}
+
+.record-book-summary h3 {
+  font-size: clamp(1.25rem, 2vw, 1.85rem);
+}
+
+.record-book-summary span,
+.prompt-group > p {
+  color: #667771;
+  font-weight: 850;
+  line-height: 1.6;
+}
+
+.record-meta-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.record-meta-pills span,
+.record-card-head span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  border-radius: 999px;
+  padding: 0 9px;
+  color: #356f59;
+  background: #eaf7ef;
+  font-size: 0.75rem;
+  font-weight: 950;
+}
+
+.prompt-group {
+  display: grid;
+  gap: 10px;
+}
+
+.prompt-group > p {
+  margin: 0;
+}
+
+.prompt-card,
+.story-output-card {
+  display: grid;
+  gap: 10px;
+  padding: 13px;
+  border: 1px solid rgba(151, 130, 92, 0.14);
+  border-radius: 18px;
+  background: #fffaf0;
+}
+
+.record-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.record-card-head small {
+  color: #8a7661;
+  font-weight: 850;
+}
+
+.prompt-card h4,
+.story-output-card h4 {
+  margin: 0;
+  color: #243d36;
+  font-size: 1rem;
+}
+
+.prompt-copy-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.prompt-block {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 11px;
+  border: 1px dashed rgba(151, 130, 92, 0.22);
+  border-radius: 15px;
+  background: rgba(255, 253, 247, 0.72);
+}
+
+.prompt-block span {
+  color: #8c5c1f;
+  font-size: 0.78rem;
+  font-weight: 950;
+}
+
+.prompt-block pre {
+  overflow: auto;
+  max-height: 260px;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #38524a;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 760;
+  line-height: 1.65;
+}
+
+.story-output-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.story-output-card p {
+  margin: 0;
+  color: #38524a;
+  font-weight: 850;
+  line-height: 1.7;
+}
+
+.record-empty.compact {
+  min-height: 120px;
+  padding: 16px;
+}
+
+.records-empty-state h3 {
+  margin: 0;
+  color: #243d36;
+}
+
+.theater-workspace {
+  margin-top: 0;
   padding: 18px;
 }
 
@@ -1225,8 +1450,13 @@
   .product-header,
   .product-shelf-grid,
   .product-workspace,
+  .records-layout,
   .theater-curtain {
     grid-template-columns: 1fr;
+  }
+
+  .record-book-selector {
+    position: static;
   }
 
   .product-header {
@@ -1250,6 +1480,7 @@
   .creation-panel,
   .reader-workspace,
   .record-workspace,
+  .records-page,
   .theater-workspace {
     border-radius: 22px;
     padding: 14px;
@@ -1264,20 +1495,6 @@
     width: 48px;
     height: 48px;
     border-radius: 16px;
-  }
-
-  .product-notice {
-    align-items: flex-start;
-    flex-direction: column;
-    padding: 12px 14px;
-  }
-
-  .product-notice a {
-    margin-left: 0;
-  }
-
-  .flow-board {
-    grid-template-columns: repeat(9, minmax(132px, 1fr));
   }
 
   .product-section-head,
@@ -1307,7 +1524,9 @@
   }
 
   .creation-actions,
-  .task-row {
+  .task-row,
+  .prompt-copy-grid,
+  .story-output-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1316,8 +1535,13 @@
     border-radius: 16px;
   }
 
+  .reader-book-layout {
+    grid-template-columns: 1fr;
+  }
+
   .open-book {
     grid-template-columns: 1fr;
+    min-height: auto;
     padding: 10px;
   }
 
@@ -1336,6 +1560,19 @@
 
   .page-turn {
     top: 38%;
+  }
+
+  .page-strip {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(132px, 1fr);
+    overflow-x: auto;
+    overflow-y: hidden;
+    max-height: none;
+    padding: 0 0 2px;
+  }
+
+  .page-strip button {
+    min-height: 58px;
   }
 
   .theater-curtain {

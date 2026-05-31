@@ -1,12 +1,13 @@
 import type { PictureBook, PictureBookPage, PictureBookSummary, PromptRecord } from "./types";
 
-export const productTitle = "我的绘本书架";
+export const productTitle = "桂韵创想家";
+export const bookshelfTitle = "我的绘本书架";
 export const companionName = "桂小雅";
 export const companionSchool = "桂雅路小学";
 
 export function displayText(text = "") {
   return text
-    .replace(/肖予曦的绘本书架/gu, productTitle)
+    .replace(/肖予曦的绘本书架/gu, bookshelfTitle)
     .replace(/肖予曦/gu, "我")
     .replace(/桂小灵/gu, companionName)
     .replace(/Gui Xiaoling/gu, "Gui Xiaoya")

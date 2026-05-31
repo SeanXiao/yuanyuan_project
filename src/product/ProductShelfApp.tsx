@@ -2,12 +2,10 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   BookOpen,
-  Bot,
-  Calendar,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Clock,
+  Edit3,
   ExternalLink,
   FileText,
   Home,
@@ -19,7 +17,6 @@ import {
   Plus,
   RefreshCw,
   Send,
-  Sparkles,
   Trash2,
   Volume2
 } from "lucide-react";
@@ -32,11 +29,12 @@ import {
   listPictureBooks,
   preloadPictureBookSpeech
 } from "./pictureBookApi";
-import { companionName, companionSchool, displayBook, displayBookSummary, displayText, productTitle } from "./productCopy";
+import ClassicApp from "../App";
+import { bookshelfTitle, companionName, companionSchool, displayBook, displayBookSummary, displayText, productTitle } from "./productCopy";
 import { speakProductText, stopProductSpeech } from "./productSpeech";
 import type { BookLanguage, PictureBook, PictureBookPage, PictureBookSummary, PromptRecord, ProtagonistGender } from "./types";
 
-type ProductView = "shelf" | "reader" | "records" | "theater";
+type ProductView = "shelf" | "desk" | "detail" | "records" | "theater";
 type ImageTaskStatus = "idle" | "running" | "done" | "error";
 type ProductStage = "input" | "analysis" | "content" | "images" | "saved";
 
@@ -63,39 +61,51 @@ const defaultInspirationChips = [
   "德天瀑布旁的天琴故事"
 ];
 
-const flowSteps = [
-  { number: 1, title: "灵感输入", detail: "语音或文字" },
-  { number: 2, title: "AI 灵感分析", detail: "地点、人物、文化元素" },
-  { number: 3, title: "AI 生成绘本内容", detail: "故事、小百科、讲解词" },
-  { number: 4, title: "生成插图 & 保存", detail: "4 页插图入库" },
-  { number: 5, title: productTitle, detail: "我的作品书架" },
-  { number: 6, title: "打开绘本", detail: "故事、插图、小百科" },
-  { number: 7, title: "查看创作记录", detail: "灵感与生成过程" },
-  { number: 8, title: "进入绘本剧场", detail: "中文或 English 朗读" },
-  { number: 9, title: "展示 / 阅读", detail: "比赛展示或自己阅读" }
-];
-
-const stageStepMap: Record<ProductStage, number> = {
-  input: 1,
-  analysis: 2,
-  content: 3,
-  images: 4,
-  saved: 5
-};
-
-const viewStepMap: Record<ProductView, number> = {
-  shelf: 5,
-  reader: 6,
-  records: 7,
-  theater: 8
-};
-
 const emptyImageTasks: Record<number, ImageTaskStatus> = {
   1: "idle",
   2: "idle",
   3: "idle",
   4: "idle"
 };
+
+function parseProductRoute(hash = window.location.hash): { view: ProductView; bookId?: string } {
+  const cleaned = hash.replace(/^#\/?/u, "");
+  const [section, encodedBookId, subview] = cleaned.split("/");
+  if (!cleaned || section === "shelf") {
+    return { view: "shelf" };
+  }
+  if (section === "desk") {
+    return { view: "desk" };
+  }
+  if (section === "records") {
+    return { view: "records" };
+  }
+  if (section === "theater") {
+    return { view: "theater" };
+  }
+  if (section === "book" && encodedBookId) {
+    const bookId = decodeURIComponent(encodedBookId);
+    if (subview === "theater") {
+      return { view: "theater", bookId };
+    }
+    if (subview === "records") {
+      return { view: "records", bookId };
+    }
+    return { view: "detail", bookId };
+  }
+  return { view: "shelf" };
+}
+
+function bookRoute(id: string, view: ProductView = "detail") {
+  const encodedId = encodeURIComponent(id);
+  if (view === "theater") {
+    return `#/book/${encodedId}/theater`;
+  }
+  if (view === "records") {
+    return `#/book/${encodedId}/records`;
+  }
+  return `#/book/${encodedId}`;
+}
 
 function formatShelfDate(value: string) {
   return new Intl.DateTimeFormat("zh-CN", {
@@ -210,16 +220,18 @@ function appendProgressLog(progress: ProductProgress, lines: string[]) {
 }
 
 export default function ProductShelfApp() {
+  const initialRoute = useMemo(() => parseProductRoute(), []);
   const [books, setBooks] = useState<PictureBookSummary[]>([]);
   const [activeBook, setActiveBook] = useState<PictureBook | null>(null);
-  const [view, setView] = useState<ProductView>("shelf");
+  const [view, setView] = useState<ProductView>(initialRoute.view);
+  const [routeBookId, setRouteBookId] = useState(initialRoute.bookId || "");
   const [idea, setIdea] = useState(defaultIdea);
   const [bookLanguage, setBookLanguage] = useState<BookLanguage>("zh");
   const [protagonistGender, setProtagonistGender] = useState<ProtagonistGender>("girl");
   const [shouldGenerateImage, setShouldGenerateImage] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [notice, setNotice] = useState(`默认进入${productTitle}，${companionName}陪我继续阅读、朗读和展示。`);
+  const [, setNotice] = useState("");
   const [progress, setProgress] = useState<ProductProgress | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<PictureBookSummary | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
@@ -235,13 +247,32 @@ export default function ProductShelfApp() {
   const selectedPage = displayActiveBook?.pages[selectedPageIndex] || null;
   const readAllText = useMemo(() => (displayActiveBook ? buildFullReadText(displayActiveBook) : ""), [displayActiveBook]);
   const latestBook = books[0] || null;
-  const activeStep = progress?.active ? stageStepMap[progress.stage] : viewStepMap[view];
 
   useEffect(() => {
     document.title = productTitle;
+    if (!window.location.hash) {
+      window.history.replaceState(null, "", "#/shelf");
+    }
     void refreshBooks({ selectLatest: true });
     return () => stopProductSpeech();
   }, []);
+
+  useEffect(() => {
+    const syncRoute = () => {
+      const nextRoute = parseProductRoute();
+      setView(nextRoute.view);
+      setRouteBookId(nextRoute.bookId || "");
+    };
+    syncRoute();
+    window.addEventListener("hashchange", syncRoute);
+    return () => window.removeEventListener("hashchange", syncRoute);
+  }, []);
+
+  useEffect(() => {
+    if (routeBookId && activeBook?.id !== routeBookId) {
+      void openBook(routeBookId, { silent: true, nextView: view });
+    }
+  }, [activeBook?.id, routeBookId, view]);
 
   useEffect(() => {
     setPageIndex(0);
@@ -271,7 +302,10 @@ export default function ProductShelfApp() {
       const nextBooks = await listPictureBooks();
       setBooks(nextBooks);
       if (options?.selectLatest && nextBooks[0]) {
-        void openBook(nextBooks[0].id, { silent: true, nextView: "shelf" });
+        const route = parseProductRoute();
+        if (!route.bookId) {
+          void openBook(nextBooks[0].id, { silent: true, nextView: route.view });
+        }
       }
       return nextBooks;
     } catch (error) {
@@ -287,7 +321,7 @@ export default function ProductShelfApp() {
     try {
       const book = await getPictureBook(id);
       setActiveBook(book);
-      setView(options?.nextView || "reader");
+      setView(options?.nextView || "detail");
       setProgress(null);
       if (!options?.silent) {
         setNotice("绘本已经打开，可以查看故事、小百科、创作记录或进入绘本剧场。");
@@ -317,13 +351,35 @@ export default function ProductShelfApp() {
     }
   }
 
+  function navigateToShelf() {
+    window.location.hash = "#/shelf";
+    void refreshBooks({ silent: true });
+  }
+
+  function navigateToDesk() {
+    window.location.hash = "#/desk";
+    setView("desk");
+    setProgress(null);
+    window.setTimeout(() => ideaInputRef.current?.focus(), 260);
+  }
+
+  function navigateToRecords() {
+    window.location.hash = "#/records";
+    setView("records");
+    void refreshBooks({ selectLatest: true, silent: true });
+  }
+
+  function navigateToBook(bookId: string, nextView: ProductView = "detail") {
+    window.location.hash = bookRoute(bookId, nextView);
+    void openBook(bookId, { nextView });
+  }
+
   function startNewBook() {
-    setView("shelf");
+    navigateToDesk();
     setProgress(null);
     setIdea("");
-    setNotice(`可以输入新的故事灵感，作品完成后会自动回到${productTitle}。`);
+    setNotice("");
     creationPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-    window.setTimeout(() => ideaInputRef.current?.focus(), 260);
   }
 
   function pickIdea(chip: string) {
@@ -340,7 +396,8 @@ export default function ProductShelfApp() {
     }
 
     setIsGenerating(true);
-    setView("shelf");
+    window.location.hash = "#/desk";
+    setView("desk");
     setActiveBook(null);
     setProgress(makeProgress("analysis", "AI 正在分析灵感", "正在提取地点、主角、广西文化元素和故事动作。", [`收到灵感：${compactText(cleanIdea, 80)}`]));
     setNotice(`${companionName}正在分析灵感，稍后会生成绘本内容。`);
@@ -368,7 +425,7 @@ export default function ProductShelfApp() {
       setActiveBook(draft.book);
       setBooks(draft.books);
       setPageIndex(0);
-      setView("reader");
+      setView("desk");
 
       setProgress((current) =>
         current
@@ -382,7 +439,7 @@ export default function ProductShelfApp() {
               [
                 `标题：${compactText(draft.book.title, 60)}`,
                 `故事路线：${compactText(draft.book.outline, 88)}`,
-                shouldGenerateImage ? "4 页插图任务已经开始。" : `作品准备放入${productTitle}。`
+                shouldGenerateImage ? "4 页插图任务已经开始。" : `作品准备放入${bookshelfTitle}。`
               ]
             )
           : current
@@ -452,12 +509,12 @@ export default function ProductShelfApp() {
                   detail: failedCount ? `有 ${failedCount} 页插图暂时没画好，作品已先入库。` : "4 页故事、插图、小百科和创作记录都已保存。",
                   error: failedCount ? "部分插图生成失败" : undefined
                 },
-                [failedCount ? "绘本已进入书架，失败插图可以在打开绘本后重画。" : `绘本已进入${productTitle}。`]
+                [failedCount ? "绘本已进入书架，失败插图可以在打开绘本后重画。" : `绘本已进入${bookshelfTitle}。`]
               )
             : current
         );
         await refreshBooks();
-        setNotice(failedCount ? "绘本已保存，有几页插图可以继续重画。" : `绘本已保存到${productTitle}。`);
+        setNotice(failedCount ? "绘本已保存，有几页插图可以继续重画。" : `绘本已保存到${bookshelfTitle}。`);
       } else {
         if (bookLanguage === "zh") {
           void preloadSpeech(draft.book.id);
@@ -472,12 +529,12 @@ export default function ProductShelfApp() {
                   title: "绘本已保存到书架",
                   detail: "故事、小百科和创作记录已保存，插图可以稍后补画。"
                 },
-                [`绘本已进入${productTitle}。`]
+                [`绘本已进入${bookshelfTitle}。`]
               )
             : current
         );
         await refreshBooks();
-        setNotice(`绘本已保存到${productTitle}，可以打开继续补画插图。`);
+        setNotice(`绘本已保存到${bookshelfTitle}，可以打开继续补画插图。`);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "绘本制作失败";
@@ -571,13 +628,14 @@ export default function ProductShelfApp() {
       if (activeBook?.id === target.id) {
         const nextActiveBook = nextBooks[0];
         setActiveBook(null);
+        window.location.hash = "#/shelf";
         setView("shelf");
         if (nextActiveBook) {
           void openBook(nextActiveBook.id, { silent: true, nextView: "shelf" });
         }
       }
       setProgress(null);
-      setNotice(`《${displayText(target.title)}》已从${productTitle}移走。`);
+      setNotice(`《${displayText(target.title)}》已从${bookshelfTitle}移走。`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "删除失败";
       setNotice(`删除失败：${message}`);
@@ -668,53 +726,73 @@ export default function ProductShelfApp() {
     );
   }
 
+  const shouldShowProductHeader = view !== "detail" && view !== "theater";
+
   return (
     <main className="shelf-app">
-      <header className="product-header">
-        <div className="product-brand">
-          <span className="product-brand-mark" aria-hidden="true">
-            <BookOpen size={24} />
-          </span>
-          <div>
-            <p className="product-eyebrow">桂韵创想家 · {companionSchool}</p>
-            <h1>{productTitle}</h1>
-            <span>{companionName}代表{companionSchool}，陪我完成灵感分析、绘本生成、插图保存和比赛展示。</span>
+      {shouldShowProductHeader ? (
+        <header className="product-header">
+          <div className="product-brand">
+            <span className="product-brand-mark" aria-hidden="true">
+              <BookOpen size={24} />
+            </span>
+            <div>
+              <p className="product-eyebrow">桂韵创想家 · {companionSchool}</p>
+              <h1>{productTitle}</h1>
+            </div>
           </div>
-        </div>
-        <nav className="product-nav" aria-label="绘本产品导航">
-          <button type="button" className={view === "shelf" ? "active" : ""} onClick={() => setView("shelf")}>
-            <Home size={17} />
-            我的书架
-          </button>
-          <button type="button" className={view === "reader" ? "active" : ""} onClick={() => setView("reader")} disabled={!activeBook}>
-            <BookOpen size={17} />
-            打开绘本
-          </button>
-          <button type="button" className={view === "records" ? "active" : ""} onClick={() => setView("records")} disabled={!activeBook}>
-            <FileText size={17} />
-            创作记录
-          </button>
-          <button type="button" className={view === "theater" ? "active" : ""} onClick={() => setView("theater")} disabled={!activeBook}>
-            <Volume2 size={17} />
-            绘本剧场
-          </button>
-        </nav>
-      </header>
+          <nav className="product-nav" aria-label="绘本产品导航">
+            <button type="button" className={view === "shelf" ? "active" : ""} onClick={navigateToShelf}>
+              <Home size={17} />
+              我的书架
+            </button>
+            <button type="button" className={view === "desk" ? "active" : ""} onClick={navigateToDesk}>
+              <Edit3 size={17} />
+              我的书桌
+            </button>
+            <button
+              type="button"
+              className=""
+              onClick={() => {
+                if (activeBook) {
+                  navigateToBook(activeBook.id, "detail");
+                }
+              }}
+              disabled={!activeBook}
+            >
+              <BookOpen size={17} />
+              绘本
+            </button>
+            <button type="button" className={view === "records" ? "active" : ""} onClick={navigateToRecords}>
+              <FileText size={17} />
+              创作记录
+            </button>
+            <button
+              type="button"
+              className=""
+              onClick={() => {
+                if (activeBook) {
+                  navigateToBook(activeBook.id, "theater");
+                } else {
+                  window.location.hash = "#/theater";
+                }
+              }}
+              disabled={!activeBook}
+            >
+              <Volume2 size={17} />
+              绘本剧场
+            </button>
+          </nav>
+        </header>
+      ) : null}
 
-      <section className="product-notice" aria-live="polite">
-        <Sparkles size={18} />
-        <span>{notice}</span>
-        <a href="#/classic">保留原界面</a>
-      </section>
-
-      <ProductFlow activeStep={activeStep} progress={progress} />
-
-      <section className="product-shelf-grid">
+      {view === "shelf" ? (
+      <section className="product-shelf-grid bookshelf-only">
         <div className="bookshelf-panel">
           <div className="product-section-head">
             <div>
               <p className="product-eyebrow">默认进入</p>
-              <h2>{productTitle}</h2>
+              <h2>{bookshelfTitle}</h2>
               <span>{books.length ? `已保存 ${books.length} 本作品，最近更新：${latestBook ? formatShelfDate(latestBook.updatedAt) : "暂无"}` : "还没有作品，先新建第一本绘本。"}</span>
             </div>
             <div className="section-actions">
@@ -735,7 +813,7 @@ export default function ProductShelfApp() {
                 const displaySummary = displayBooks[index] || displayBookSummary(book);
                 return (
                 <article className={`cover-card ${activeBook?.id === book.id ? "active" : ""}`} key={book.id}>
-                  <button type="button" className="cover-open" onClick={() => void openBook(book.id, { nextView: "reader" })}>
+                  <button type="button" className="cover-open" onClick={() => navigateToBook(book.id, "detail")}>
                     <div className="cover-art">
                       {book.coverImageUrl ? <img src={book.coverImageUrl} alt={displaySummary.title} /> : <ImageIcon size={34} />}
                     </div>
@@ -748,6 +826,16 @@ export default function ProductShelfApp() {
                   <button className="cover-delete" type="button" onClick={() => requestDeleteBook(book)} aria-label={`删除${displaySummary.title}`}>
                     <Trash2 size={16} />
                   </button>
+                  <div className="cover-actions">
+                    <button className="soft-button" type="button" onClick={() => navigateToBook(book.id, "detail")}>
+                      <BookOpen size={15} />
+                      打开绘本
+                    </button>
+                    <button className="strong-button" type="button" onClick={() => navigateToBook(book.id, "theater")}>
+                      <Volume2 size={15} />
+                      剧场模式
+                    </button>
+                  </div>
                 </article>
                 );
               })}
@@ -755,101 +843,22 @@ export default function ProductShelfApp() {
           ) : (
             <div className="empty-bookshelf">
               <BookOpen size={40} />
-              <h3>{productTitle}还在等第一本作品</h3>
+              <h3>{bookshelfTitle}还在等第一本作品</h3>
               <p>输入一个广西文化旅行灵感，生成后会自动保存到这里。</p>
             </div>
           )}
         </div>
 
-        <aside className="creation-panel" ref={creationPanelRef}>
-          <div className="assistant-card">
-            <img src={companionRobot} alt={companionName} />
-            <div>
-              <p className="product-eyebrow">{companionName}</p>
-              <strong>{isGenerating ? "正在整理新绘本" : `${companionSchool} AI 伙伴`}</strong>
-            </div>
-          </div>
-
-          <form className="inspiration-form" onSubmit={generateBook}>
-            <div className="form-head">
-              <span>1</span>
-              <div>
-                <h2>灵感输入</h2>
-                <p>输入灵感语音或文字</p>
-              </div>
-            </div>
-            <textarea
-              ref={ideaInputRef}
-              value={idea}
-              onChange={(event) => setIdea(event.target.value)}
-              disabled={isGenerating}
-              placeholder="例如：我想写一本我在漓江竹筏上发现壮锦花纹的故事……"
-            />
-            <div className="segmented-stack">
-              <SegmentedControl
-                label="绘本语言"
-                options={[
-                  { label: "中文", value: "zh" },
-                  { label: "English", value: "en" }
-                ]}
-                value={bookLanguage}
-                disabled={isGenerating}
-                onChange={(value) => setBookLanguage(value as BookLanguage)}
-              />
-              <SegmentedControl
-                label="主角形象"
-                options={[
-                  { label: "女孩主角", value: "girl" },
-                  { label: "男孩主角", value: "boy" }
-                ]}
-                value={protagonistGender}
-                disabled={isGenerating}
-                onChange={(value) => setProtagonistGender(value as ProtagonistGender)}
-              />
-            </div>
-            <div className="creation-actions">
-              <button
-                className={`round-tool ${isListening ? "active" : ""}`}
-                type="button"
-                onClick={isListening ? stopListening : startListening}
-                aria-label={isListening ? "停止语音输入" : "开始语音输入"}
-              >
-                {isListening ? <MicOff size={21} /> : <Mic size={21} />}
-              </button>
-              <label className="check-tool">
-                <input
-                  type="checkbox"
-                  checked={shouldGenerateImage}
-                  onChange={(event) => setShouldGenerateImage(event.target.checked)}
-                  disabled={isGenerating}
-                />
-                生成 4 页插图
-              </label>
-              <button className="strong-button submit-book" type="submit" disabled={!idea.trim() || isGenerating}>
-                {isGenerating ? <LoaderCircle size={18} /> : <Send size={18} />}
-                {isGenerating ? "生成中" : "生成绘本"}
-              </button>
-            </div>
-          </form>
-
-          <div className="idea-chip-panel">
-            <div className="mini-head">
-              <p className="product-eyebrow">灵感样例</p>
-              <span>点击填入</span>
-            </div>
-            <div className="idea-chips">
-              {defaultInspirationChips.map((chip) => (
-                <button type="button" key={chip} onClick={() => pickIdea(chip)} disabled={isGenerating}>
-                  {chip}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {progress ? <ProductProgressPanel progress={progress} /> : null}
-        </aside>
       </section>
+      ) : null}
 
+      {view === "desk" ? (
+        <section className="product-classic-desk" aria-label="我的书桌">
+          <ClassicApp embeddedInProduct />
+        </section>
+      ) : null}
+
+      {view === "detail" ? (
       <section className="product-workspace">
         <ReaderWorkspace
           activeBook={displayActiveBook}
@@ -857,21 +866,39 @@ export default function ProductShelfApp() {
           selectedPageIndex={selectedPageIndex}
           view={view}
           imageTasks={progress?.imageTasks}
-          onSetView={setView}
+          onSetView={(nextView) => {
+            if (activeBook && (nextView === "records" || nextView === "theater" || nextView === "detail")) {
+              navigateToBook(activeBook.id, nextView);
+              return;
+            }
+            setView(nextView);
+          }}
+          onBackToShelf={navigateToShelf}
           onGoToPage={goToPage}
           onReadCurrentPage={readCurrentPage}
           onReadFullBook={readFullBook}
           onRegeneratePage={regeneratePageImage}
           isGenerating={isGenerating}
         />
-        <RecordWorkspace activeBook={displayActiveBook} expanded={view === "records"} onOpenRecords={() => setView("records")} />
       </section>
+      ) : null}
+
+      {view === "records" ? (
+        <RecordsLibrary
+          books={displayBooks}
+          activeBook={displayActiveBook}
+          onSelectBook={(bookId) => navigateToBook(bookId, "records")}
+          onOpenBook={(bookId) => navigateToBook(bookId, "detail")}
+          onOpenTheater={(bookId) => navigateToBook(bookId, "theater")}
+        />
+      ) : null}
 
       {view === "theater" ? (
         <TheaterWorkspace
           activeBook={displayActiveBook}
           selectedPage={selectedPage}
           selectedPageIndex={selectedPageIndex}
+          onBackToShelf={navigateToShelf}
           onGoToPage={goToPage}
           onReadCurrentPage={readCurrentPage}
           onReadFullBook={readFullBook}
@@ -887,7 +914,7 @@ export default function ProductShelfApp() {
             <div>
               <p className="product-eyebrow">删除作品</p>
               <h2 id="delete-book-title">确定删除《{displayText(deleteTarget.title)}》吗？</h2>
-              <p>删除后会从“{productTitle}”移走这本作品，不能在页面里恢复。</p>
+              <p>删除后会从“{bookshelfTitle}”移走这本作品，不能在页面里恢复。</p>
             </div>
             <div className="confirm-actions">
               <button className="soft-button" type="button" onClick={() => setDeleteTarget(null)}>
@@ -938,24 +965,157 @@ function SegmentedControl({
   );
 }
 
-function ProductFlow({ activeStep, progress }: { activeStep: number; progress: ProductProgress | null }) {
+const deskProgressSteps = [
+  { stage: "input", label: "写下灵感" },
+  { stage: "content", label: "整理故事" },
+  { stage: "images", label: "绘制插图" },
+  { stage: "saved", label: "装订成册" },
+  { stage: "saved", label: "放进书架" }
+] satisfies { stage: ProductStage; label: string }[];
+
+const deskStageOrder: Record<ProductStage, number> = {
+  input: 0,
+  analysis: 1,
+  content: 1,
+  images: 2,
+  saved: 4
+};
+
+const deskStagePercent: Record<ProductStage, number> = {
+  input: 10,
+  analysis: 30,
+  content: 52,
+  images: 76,
+  saved: 100
+};
+
+function DeskStage({
+  activeBook,
+  progress,
+  onOpenBook,
+  onOpenRecords,
+  onReadFullBook
+}: {
+  activeBook: PictureBook | null;
+  progress: ProductProgress | null;
+  onOpenBook: () => void;
+  onOpenRecords: () => void;
+  onReadFullBook: () => void;
+}) {
+  const currentStep = progress ? deskStageOrder[progress.stage] : 0;
+  const progressPercent = progress ? deskStagePercent[progress.stage] : 0;
+  const hasImageTasks = progress ? Object.values(progress.imageTasks).some((status) => status !== "idle") : false;
+  const stageTitle = progress?.active
+    ? `${companionName}正在读我的灵感，马上开始整理故事`
+    : activeBook
+      ? "绘本已经装订好，可以打开阅读"
+      : `从一句灵感开始，${companionName}陪我做一本广西文化绘本`;
+
   return (
-    <section className="flow-board" aria-label="完整流程">
-      {flowSteps.map((step) => {
-        const done = !progress?.active && step.number < activeStep;
-        const active = step.number === activeStep;
-        return (
-          <article className={`flow-step flow-step-${step.number} ${active ? "active" : ""} ${done ? "done" : ""}`} key={step.number}>
-            <span>{step.number}</span>
-            <div>
-              <strong>{step.title}</strong>
-              <p>{step.detail}</p>
+    <section className={`desk-stage ${progress ? "has-progress" : "is-empty"}`}>
+      <div className="desk-stage-head">
+        <div>
+          <p className="product-eyebrow">{companionName}绘本工坊</p>
+          <h2>{activeBook ? activeBook.title : `${companionName}的绘本工坊`}</h2>
+        </div>
+        <div className="section-actions">
+          <button className="soft-button" type="button" onClick={onReadFullBook} disabled={!activeBook}>
+            <Volume2 size={17} />
+            朗读绘本
+          </button>
+          <button className="soft-button" type="button" onClick={onOpenRecords} disabled={!activeBook}>
+            <FileText size={17} />
+            创作记录
+          </button>
+        </div>
+      </div>
+
+      {progress ? (
+        <div className={`desk-progress-board ${progress.error ? "has-error" : ""}`}>
+          <div className="desk-progress-banner">
+            <Paintbrush size={22} />
+            <strong>{stageTitle}</strong>
+          </div>
+          <div className="desk-progress-card">
+            <div className="mini-head">
+              <div>
+                <p className="product-eyebrow">绘本制作进度</p>
+                <h3>{progress.title}</h3>
+              </div>
+              <span className="elapsed-pill">
+                <Clock size={15} />
+                陪伴 {progress.elapsedSeconds}s
+              </span>
             </div>
-            {done ? <CheckCircle2 size={17} /> : null}
-          </article>
-        );
-      })}
+            <p>{progress.detail}</p>
+            <div className="desk-progress-rail" aria-hidden="true">
+              <span style={{ width: `${progressPercent}%` }} />
+            </div>
+            <div className="desk-stage-steps" aria-label="绘本制作阶段">
+              {deskProgressSteps.map((step, index) => {
+                const done = index < currentStep || (!progress.active && progress.stage === "saved");
+                const active = index === currentStep && progress.active;
+                return (
+                  <span className={`${done ? "done" : ""} ${active ? "active" : ""}`} key={`${step.stage}-${step.label}`}>
+                    {done ? <CheckMarkIcon /> : <i />}
+                    {step.label}
+                  </span>
+                );
+              })}
+            </div>
+            {hasImageTasks ? (
+              <div className="task-row desk-task-row">
+                {[1, 2, 3, 4].map((pageNumber) => (
+                  <span className={progress.imageTasks[pageNumber]} key={pageNumber}>
+                    第 {pageNumber} 页
+                  </span>
+                ))}
+              </div>
+            ) : null}
+            <div className="desk-log-panel">
+              <div className="mini-head">
+                <strong>创作过程</strong>
+                <span>公开草稿流</span>
+              </div>
+              <div className="log-list">
+                {progress.logs.map((log, index) => (
+                  <p key={`${log}-${index}`}>
+                    <span>{String(index + 1).padStart(2, "0")}</span>
+                    {log}
+                  </p>
+                ))}
+              </div>
+            </div>
+            {!progress.active && activeBook ? (
+              <div className="desk-complete-actions">
+                <button className="strong-button" type="button" onClick={onOpenBook}>
+                  <BookOpen size={17} />
+                  打开绘本
+                </button>
+                <button className="soft-button" type="button" onClick={onOpenRecords}>
+                  <FileText size={17} />
+                  查看提示词记录
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : (
+        <div className="desk-empty">
+          <Edit3 size={46} />
+          <h2>从一句灵感开始</h2>
+          <p>在我的书桌输入或说出广西文化旅行故事，{companionName}会帮我整理成 4 页绘本、插图和小讲解词。</p>
+        </div>
+      )}
     </section>
+  );
+}
+
+function CheckMarkIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
   );
 }
 
@@ -1002,6 +1162,7 @@ function ReaderWorkspace({
   view,
   imageTasks,
   onSetView,
+  onBackToShelf,
   onGoToPage,
   onReadCurrentPage,
   onReadFullBook,
@@ -1014,6 +1175,7 @@ function ReaderWorkspace({
   view: ProductView;
   imageTasks?: Record<number, ImageTaskStatus>;
   onSetView: (view: ProductView) => void;
+  onBackToShelf: () => void;
   onGoToPage: (pageIndex: number) => void;
   onReadCurrentPage: (languageOverride?: BookLanguage) => void;
   onReadFullBook: () => void;
@@ -1035,14 +1197,18 @@ function ReaderWorkspace({
   const taskStatus = selectedPage ? imageTasks?.[selectedPage.pageNumber] || "idle" : "idle";
 
   return (
-    <section className={`reader-workspace ${view === "reader" ? "is-active" : ""}`}>
+    <section className={`reader-workspace ${view === "detail" ? "is-active" : ""}`}>
       <div className="product-section-head">
         <div>
-          <p className="product-eyebrow">6 打开绘本</p>
+          <p className="product-eyebrow">打开绘本</p>
           <h2>{activeBook.title}</h2>
           <span>{activeBook.subtitle}</span>
         </div>
         <div className="section-actions">
+          <button className="soft-button" type="button" onClick={onBackToShelf}>
+            <ChevronLeft size={17} />
+            返回书架
+          </button>
           <button className="soft-button" type="button" onClick={onReadFullBook}>
             <Volume2 size={17} />
             朗读全书
@@ -1059,7 +1225,7 @@ function ReaderWorkspace({
       </div>
 
       {selectedPage ? (
-        <>
+        <div className="reader-book-layout">
           <div className="open-book">
             <button className="page-turn left" type="button" onClick={() => onGoToPage(selectedPageIndex - 1)} disabled={selectedPageIndex === 0}>
               <ChevronLeft size={22} />
@@ -1075,7 +1241,6 @@ function ReaderWorkspace({
               )}
             </div>
             <article className="book-page text-page">
-              <div className="page-number-pill">{language === "en" ? `Page ${selectedPage.pageNumber}` : `第 ${selectedPage.pageNumber} 页`}</div>
               <h3>{selectedPage.title}</h3>
               <p>{selectedPage.text}</p>
               <div className="culture-card">
@@ -1116,7 +1281,7 @@ function ReaderWorkspace({
               </button>
             ))}
           </div>
-        </>
+        </div>
       ) : (
         <div className="empty-bookshelf">
           <ImageIcon size={40} />
@@ -1128,54 +1293,197 @@ function ReaderWorkspace({
   );
 }
 
-function RecordWorkspace({
+function RecordsLibrary({
+  books,
   activeBook,
-  expanded,
-  onOpenRecords
+  onSelectBook,
+  onOpenBook,
+  onOpenTheater
 }: {
+  books: PictureBookSummary[];
   activeBook: PictureBook | null;
-  expanded: boolean;
-  onOpenRecords: () => void;
+  onSelectBook: (bookId: string) => void;
+  onOpenBook: (bookId: string) => void;
+  onOpenTheater: (bookId: string) => void;
 }) {
   const records = activeBook?.promptRecords || [];
-  const visibleRecords = expanded ? records : records.slice(0, 4);
+  const storyRecords = records.filter((record) => record.type === "story");
+  const imageRecords = records.filter((record) => record.type === "image");
+  const cultureRecords = records.filter((record) => record.type === "culture");
+  const systemRecords = records.filter((record) => record.type === "system");
 
   return (
-    <section className={`record-workspace ${expanded ? "is-expanded" : ""}`}>
-      <div className="product-section-head compact">
+    <section className="records-page">
+      <div className="product-section-head">
         <div>
-          <p className="product-eyebrow">7 查看创作记录</p>
-          <h2>创作记录</h2>
-          <span>{activeBook ? `共 ${records.length} 条灵感与生成记录` : "打开绘本后显示记录"}</span>
+          <p className="product-eyebrow">创作记录</p>
+          <h2>核心提示词和故事输出</h2>
+          <span>{activeBook ? `正在查看《${activeBook.title}》，共 ${records.length} 条记录` : "选择一本绘本查看完整提示词记录"}</span>
         </div>
-        <button className="soft-button" type="button" onClick={onOpenRecords} disabled={!activeBook}>
-          <FileText size={17} />
-          查看全部
-        </button>
+        <div className="section-actions">
+          <button className="soft-button" type="button" onClick={() => activeBook && onOpenBook(activeBook.id)} disabled={!activeBook}>
+            <BookOpen size={17} />
+            打开绘本
+          </button>
+          <button className="strong-button" type="button" onClick={() => activeBook && onOpenTheater(activeBook.id)} disabled={!activeBook}>
+            <Volume2 size={17} />
+            进入剧场
+          </button>
+        </div>
       </div>
-      {visibleRecords.length ? (
-        <div className="record-list">
-          {visibleRecords.map((record) => (
-            <article className="record-item" key={record.id}>
-              <div>
+
+      <div className="records-layout">
+        <aside className="record-book-selector">
+          <div className="mini-head">
+            <div>
+              <p className="product-eyebrow">选择故事</p>
+              <h3>我的绘本</h3>
+            </div>
+            <span>{books.length} 本</span>
+          </div>
+          {books.length ? (
+            <div className="record-story-list">
+              {books.map((book) => (
+                <button
+                  type="button"
+                  className={`record-story-button ${activeBook?.id === book.id ? "active" : ""}`}
+                  key={book.id}
+                  onClick={() => onSelectBook(book.id)}
+                >
+                  {book.coverImageUrl ? <img src={book.coverImageUrl} alt={book.title} /> : <BookOpen size={18} />}
+                  <span>
+                    <strong>{book.title}</strong>
+                    <small>{formatShelfDate(book.updatedAt)}</small>
+                    <em>{compactText(book.subtitle, 42)}</em>
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="record-empty compact">
+              <FileText size={26} />
+              <p>书架里还没有可查看的创作记录。</p>
+            </div>
+          )}
+        </aside>
+
+        <div className="record-detail-panel">
+          {activeBook ? (
+            <>
+              <article className="record-book-summary">
+                <div>
+                  <p className="product-eyebrow">当前故事</p>
+                  <h3>{activeBook.title}</h3>
+                  <span>{activeBook.subtitle}</span>
+                </div>
+                <div className="record-meta-pills">
+                  <span>{activeBook.language === "en" ? "English" : "中文"}</span>
+                  <span>{activeBook.protagonistGender === "boy" ? "男孩主角" : "女孩主角"}</span>
+                  <span>{formatShelfDate(activeBook.updatedAt)}</span>
+                </div>
+                <div className="prompt-block">
+                  <span>原始灵感</span>
+                  <pre>{activeBook.originalIdea}</pre>
+                </div>
+                <div className="prompt-block">
+                  <span>故事大纲</span>
+                  <pre>{activeBook.outline}</pre>
+                </div>
+              </article>
+
+              <PromptGroup title="核心创建故事提示词" description="生成标题、4 页故事、小百科、讲解词时使用的主提示词。" records={storyRecords} />
+              <PromptGroup title="系统与核心记录" description="包括模型调用失败、备用生成等系统层记录。" records={systemRecords} emptyText="这本绘本没有额外系统记录。" />
+
+              <section className="story-output-panel">
+                <div className="mini-head">
+                  <div>
+                    <p className="product-eyebrow">故事输出</p>
+                    <h3>各页故事与插图提示词</h3>
+                  </div>
+                  <span>{activeBook.pages.length} 页</span>
+                </div>
+                <div className="story-output-grid">
+                  {activeBook.pages.map((page) => (
+                    <article className="story-output-card" key={page.pageNumber}>
+                      <div className="page-number-pill">第 {page.pageNumber} 页</div>
+                      <h4>{page.title}</h4>
+                      <p>{page.text}</p>
+                      <div className="prompt-block">
+                        <span>本页插图提示词</span>
+                        <pre>{page.imagePrompt}</pre>
+                      </div>
+                      <div className="prompt-block">
+                        <span>文化小百科</span>
+                        <pre>{page.cultureNote}</pre>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+
+              <PromptGroup title="各次插图生成提示词" description="每页初始图片 Prompt、重画 Prompt 和实际图片生成记录。" records={imageRecords} />
+              <PromptGroup title="文化与讲解记录" description="小百科、讲解词和其他文化说明相关记录。" records={cultureRecords} emptyText="这本绘本没有单独的文化记录。" />
+            </>
+          ) : (
+            <div className="record-empty records-empty-state">
+              <FileText size={36} />
+              <h3>请选择一本绘本</h3>
+              <p>选择左侧故事后，可以查看核心提示词、故事输出和各页插图提示词。</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PromptGroup({
+  title,
+  description,
+  records,
+  emptyText = "还没有这类记录。"
+}: {
+  title: string;
+  description: string;
+  records: PromptRecord[];
+  emptyText?: string;
+}) {
+  return (
+    <section className="prompt-group">
+      <div className="mini-head">
+        <div>
+          <p className="product-eyebrow">Prompt</p>
+          <h3>{title}</h3>
+        </div>
+        <span>{records.length} 条</span>
+      </div>
+      <p>{description}</p>
+      {records.length ? (
+        <div className="prompt-card-list">
+          {records.map((record) => (
+            <article className="prompt-card" key={record.id}>
+              <div className="record-card-head">
                 <span>{getRecordTypeLabel(record.type)}</span>
                 <small>{formatRecordTime(record.createdAt)}</small>
               </div>
-              <strong>{record.label}</strong>
-              <p>{compactText(record.output, expanded ? 220 : 94)}</p>
-              {expanded ? (
-                <details>
-                  <summary>查看原始灵感说明</summary>
+              <h4>{record.label}</h4>
+              <div className="prompt-copy-grid">
+                <div className="prompt-block">
+                  <span>提示词</span>
                   <pre>{record.prompt}</pre>
-                </details>
-              ) : null}
+                </div>
+                <div className="prompt-block">
+                  <span>输出结果</span>
+                  <pre>{record.output}</pre>
+                </div>
+              </div>
             </article>
           ))}
         </div>
       ) : (
-        <div className="record-empty">
-          <FileText size={30} />
-          <p>还没有可查看的创作记录。</p>
+        <div className="record-empty compact">
+          <FileText size={24} />
+          <p>{emptyText}</p>
         </div>
       )}
     </section>
@@ -1186,6 +1494,7 @@ function TheaterWorkspace({
   activeBook,
   selectedPage,
   selectedPageIndex,
+  onBackToShelf,
   onGoToPage,
   onReadCurrentPage,
   onReadFullBook
@@ -1193,6 +1502,7 @@ function TheaterWorkspace({
   activeBook: PictureBook | null;
   selectedPage: PictureBookPage | null;
   selectedPageIndex: number;
+  onBackToShelf: () => void;
   onGoToPage: (pageIndex: number) => void;
   onReadCurrentPage: (languageOverride?: BookLanguage) => void;
   onReadFullBook: () => void;
@@ -1213,7 +1523,7 @@ function TheaterWorkspace({
           {selectedPage.imageUrl ? <img src={selectedPage.imageUrl} alt={`${activeBook.title} 剧场展示`} /> : <ImageIcon size={48} />}
         </div>
         <article className="theater-script">
-          <p className="product-eyebrow">8 进入绘本剧场</p>
+          <p className="product-eyebrow">绘本剧场</p>
           <h2>{activeBook.title}</h2>
           <h3>{selectedPage.title}</h3>
           <p>{selectedPage.text}</p>
@@ -1226,10 +1536,14 @@ function TheaterWorkspace({
             </button>
           </div>
           <div className="theater-mode-note">
-            <strong>9 展示 / 阅读</strong>
+            <strong>阅读模式</strong>
             <span>{theaterMode === "showcase" ? "适合比赛现场投屏展示，保留大画面和朗读控制。" : "适合自己慢慢读，按页切换，随时听当前页。"}</span>
           </div>
           <div className="reader-actions">
+            <button className="soft-button" type="button" onClick={onBackToShelf}>
+              <ChevronLeft size={17} />
+              返回书架
+            </button>
             <button className="strong-button" type="button" onClick={onReadFullBook}>
               <Volume2 size={17} />
               朗读全书

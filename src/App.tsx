@@ -685,7 +685,7 @@ function makeProgress(
   };
 }
 
-export default function App() {
+export default function App({ embeddedInProduct = false }: { embeddedInProduct?: boolean } = {}) {
   const [route, setRoute] = useState<AppRoute>(() => getAppRoute());
   const [idea, setIdea] = useState("我想写一个小朋友在三月三歌圩上遇到会唱山歌的绣球。");
   const [books, setBooks] = useState<PictureBookSummary[]>([]);
@@ -708,8 +708,11 @@ export default function App() {
   const speechSupported = Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
 
   useEffect(() => {
+    if (embeddedInProduct) {
+      return;
+    }
     document.title = route.mode === "player" ? "桂小灵绘本剧场 - 肖予曦开发" : "桂小灵绘本工坊 - 肖予曦开发";
-  }, [route.mode]);
+  }, [embeddedInProduct, route.mode]);
 
   useEffect(() => {
     const handleHashChange = () => setRoute(getAppRoute());
@@ -1182,19 +1185,9 @@ export default function App() {
   }
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell ${embeddedInProduct ? "is-product-embedded" : ""}`}>
       <section className="studio-layout">
         <aside className="left-panel">
-          <div className="brand-row">
-            <span className="brand-mark" aria-hidden="true">
-              <Sparkles size={18} />
-            </span>
-            <div>
-              <p className="eyebrow">桂小灵的创作书桌</p>
-              <h1>桂韵创想家 <span>和桂小灵一起发现广西故事</span></h1>
-            </div>
-          </div>
-
           <div className="mascot-stage">
             <img src={companionRobot} alt="桂小灵" />
             <div className="mascot-badge">

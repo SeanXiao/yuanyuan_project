@@ -157,24 +157,33 @@ async function main() {
     const shelf = await client.waitFor(() => {
       const text = document.body.innerText;
       const covers = document.querySelectorAll(".cover-card").length;
-      return text.includes("我的绘本书架") && text.includes("桂小雅") && covers > 0
+      return text.includes("我的绘本书架") && covers > 0
         ? { covers, title: document.title, text }
         : null;
     });
-    assert(shelf.title === "我的绘本书架", "default title is product shelf");
+    assert(shelf.title === "桂韵创想家", "default title is product brand");
     assert(shelf.covers > 0, "bookshelf covers render");
-    assert(!shelf.text.includes("肖予曦") && !shelf.text.includes("桂小灵"), "new product copy uses shared participant names");
+    assert(await client.evaluate(() => location.hash === "#/shelf"), "default route is shelf");
+    assert(!shelf.text.includes("肖予曦") && !shelf.text.includes("桂小灵") && !shelf.text.includes("三位小朋友"), "new product copy uses shared participant names");
+    assert(!shelf.text.includes("AI 灵感分析") && !shelf.text.includes("已经打开我的书桌"), "old flow board copy is removed");
 
     await client.evaluate(() => {
-      [...document.querySelectorAll(".product-nav button")].find((button) => button.textContent.includes("打开绘本"))?.click();
+      [...document.querySelectorAll(".cover-actions button")].find((button) => button.textContent.includes("打开绘本"))?.click();
       return true;
     });
-    const reader = await client.waitFor(() => ({
-      page: document.querySelector(".page-number-pill")?.textContent || "",
-      pageButtons: document.querySelectorAll(".page-strip button").length,
-      openBook: Boolean(document.querySelector(".open-book"))
-    }));
+    const reader = await client.waitFor(() => {
+      const openBook = Boolean(document.querySelector(".open-book"));
+      return openBook
+        ? {
+            page: document.querySelector(".page-number-pill")?.textContent || "",
+            pageButtons: document.querySelectorAll(".page-strip button").length,
+            hash: location.hash,
+            openBook
+          }
+        : null;
+    });
     assert(reader.openBook, "reader opens selected book");
+    assert(/^#\/book\/[^/]+$/u.test(reader.hash), "reader has book detail route");
     assert(reader.pageButtons >= 4, "reader has page strip");
 
     await client.evaluate(() => {
@@ -195,29 +204,38 @@ async function main() {
       return true;
     });
     const records = await client.waitFor(() => {
-      const section = document.querySelector(".record-workspace.is-expanded");
-      const recordCount = document.querySelectorAll(".record-item").length;
-      return section ? { recordCount } : null;
+      const section = document.querySelector(".records-page");
+      const text = document.body.innerText;
+      const storyButtons = document.querySelectorAll(".record-story-button").length;
+      const promptGroups = document.querySelectorAll(".prompt-group").length;
+      return section ? { hash: location.hash, promptGroups, storyButtons, text } : null;
     });
-    assert(records.recordCount > 0, "records panel opens");
-    await client.evaluate(() => {
-      document.querySelector(".record-item summary")?.click();
-      return true;
+    assert(records.hash === "#/records", "records has top level route");
+    assert(records.storyButtons > 1, "records page can choose different stories");
+    assert(records.promptGroups >= 3, "records page groups prompts");
+    assert(records.text.includes("核心创建故事提示词") && records.text.includes("各页故事与插图提示词"), "records page shows core and page prompts");
+    const recordSelection = await client.evaluate(() => {
+      const current = location.hash;
+      const other = [...document.querySelectorAll(".record-story-button")].find((button) => !button.classList.contains("active"));
+      other?.click();
+      return { current, clickedOther: Boolean(other) };
     });
-    await client.waitFor(() => document.querySelector(".record-item details")?.open);
-    pass("record details expand");
+    if (recordSelection.clickedOther) {
+      await client.waitFor(() => /#\/book\/.+\/records/u.test(location.hash));
+    }
+    pass("records story selector changes route");
 
     await client.evaluate(() => {
       [...document.querySelectorAll(".product-nav button")].find((button) => button.textContent.includes("绘本剧场"))?.click();
       return true;
     });
-    await client.waitFor(() => Boolean(document.querySelector(".theater-workspace")));
+    await client.waitFor(() => Boolean(document.querySelector(".theater-workspace")) && /\/theater$/u.test(location.hash));
     pass("theater opens");
     await client.evaluate(() => {
-      [...document.querySelectorAll(".theater-mode-switch button")].find((button) => button.textContent.includes("自己阅读"))?.click();
+      document.querySelectorAll(".theater-mode-switch button")[1]?.click();
       return true;
     });
-    await client.waitFor(() => document.querySelector(".theater-mode-switch button.active")?.textContent.includes("自己阅读"));
+    await client.waitFor(() => document.querySelectorAll(".theater-mode-switch button")[1]?.classList.contains("active"));
     pass("theater reading mode toggles");
 
     await client.evaluate(() => {
@@ -238,21 +256,27 @@ async function main() {
     pass("delete confirmation cancels");
 
     await client.evaluate(() => {
-      const chip = [...document.querySelectorAll(".idea-chips button")].find((button) => button.textContent.includes("三月三"));
+      [...document.querySelectorAll(".product-nav button")].find((button) => button.textContent.includes("我的书桌"))?.click();
+      return true;
+    });
+    await client.waitFor(() => Boolean(document.querySelector(".product-classic-desk .left-panel")) && Boolean(document.querySelector(".product-classic-desk .workbench")) && location.hash === "#/desk");
+    pass("desk opens");
+    await client.evaluate(() => {
+      const chip = [...document.querySelectorAll(".inspiration-chip-row button")].find((button) => button.textContent.includes("三月三"));
       chip?.click();
       return true;
     });
-    await client.waitFor(() => document.querySelector(".inspiration-form textarea")?.value.includes("三月三"));
+    await client.waitFor(() => document.querySelector(".idea-box textarea")?.value.includes("三月三"));
     pass("idea chip fills textarea");
     const formState = await client.evaluate(() => {
-      [...document.querySelectorAll(".segmented-control button")].find((button) => button.textContent.trim() === "English")?.click();
-      [...document.querySelectorAll(".segmented-control button")].find((button) => button.textContent.trim() === "男孩主角")?.click();
-      const checkbox = document.querySelector(".check-tool input");
+      [...document.querySelectorAll(".language-switch button")].find((button) => button.textContent.trim() === "English")?.click();
+      [...document.querySelectorAll(".language-switch button")].find((button) => button.textContent.trim() === "男孩")?.click();
+      const checkbox = document.querySelector(".toggle-line input");
       checkbox?.click();
       return {
-        boy: [...document.querySelectorAll(".segmented-control button")].find((button) => button.textContent.trim() === "男孩主角")?.classList.contains("active"),
+        boy: [...document.querySelectorAll(".language-switch button")].find((button) => button.textContent.trim() === "男孩")?.classList.contains("active"),
         checked: checkbox?.checked,
-        english: [...document.querySelectorAll(".segmented-control button")].find((button) => button.textContent.trim() === "English")?.classList.contains("active")
+        english: [...document.querySelectorAll(".language-switch button")].find((button) => button.textContent.trim() === "English")?.classList.contains("active")
       };
     });
     assert(formState.english && formState.boy, "segmented controls toggle");

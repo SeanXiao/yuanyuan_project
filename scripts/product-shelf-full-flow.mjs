@@ -205,21 +205,26 @@ async function main() {
       return true;
     });
 
-    await client.waitFor(() => document.body.innerText.includes("我的绘本书架") && document.body.innerText.includes("桂小雅"));
+    await client.waitFor(() => document.body.innerText.includes("我的绘本书架"));
+    await client.evaluate(() => {
+      [...document.querySelectorAll(".product-nav button")].find((button) => button.textContent.includes("我的书桌"))?.click();
+      return true;
+    });
+    await client.waitFor(() => Boolean(document.querySelector(".product-classic-desk .left-panel")) && Boolean(document.querySelector(".idea-box")));
 
     const idea = `完整链路确认测试：我在青秀山做五色糯米饭故事书 ${Date.now()}`;
     await client.evaluate((ideaText) => {
-      const textarea = document.querySelector(".inspiration-form textarea");
+      const textarea = document.querySelector(".idea-box textarea");
       const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
       setter?.call(textarea, ideaText);
       textarea?.dispatchEvent(new Event("input", { bubbles: true }));
-      [...document.querySelectorAll(".segmented-control button")].find((button) => button.textContent.trim() === "中文")?.click();
-      [...document.querySelectorAll(".segmented-control button")].find((button) => button.textContent.trim() === "女孩主角")?.click();
-      const checkbox = document.querySelector(".check-tool input");
+      [...document.querySelectorAll(".language-switch button")].find((button) => button.textContent.trim() === "中文")?.click();
+      [...document.querySelectorAll(".language-switch button")].find((button) => button.textContent.trim() === "女孩")?.click();
+      const checkbox = document.querySelector(".toggle-line input");
       if (checkbox && !checkbox.checked) {
         checkbox.click();
       }
-      document.querySelector(".inspiration-form")?.requestSubmit();
+      document.querySelector(".idea-box")?.requestSubmit();
       return true;
     }, idea);
 
@@ -229,22 +234,30 @@ async function main() {
       throw new Error("Generated book still contains old participant or companion names");
     }
     await client.waitFor(() => {
-      const submitReady = document.querySelector(".submit-book")?.disabled === false;
-      const progressTitle = document.querySelector(".product-progress h3")?.textContent || "";
-      return submitReady && progressTitle.includes("保存") ? progressTitle : null;
+      const detailReady = Boolean(document.querySelector(".book-view"));
+      return detailReady && (document.body.innerText.includes("打开故事书") || document.body.innerText.includes("Open Storybook")) ? true : null;
+    }, null, 30000);
+    await client.evaluate(() => {
+      [...document.querySelectorAll(".product-nav button")].find((button) => button.textContent.includes("创作记录"))?.click();
+      return true;
+    });
+    await client.waitFor(() => {
+      const text = document.body.innerText;
+      return Boolean(document.querySelector(".records-page")) && text.includes("核心创建故事提示词") && text.includes("各页故事与插图提示词") ? true : null;
     }, null, 30000);
 
     await client.evaluate(() => {
       [...document.querySelectorAll(".product-nav button")].find((button) => button.textContent.includes("我的书架"))?.click();
       return true;
     });
-    await client.waitFor(() => Boolean(document.querySelector(".cover-card.active .cover-delete") || document.querySelector(".cover-delete")));
+    await client.waitFor(() => location.hash === "#/shelf" && Boolean(document.querySelector(".bookshelf-panel")) && document.querySelectorAll(".cover-delete").length > 0);
     await captureScreenshot(client);
 
     await client.evaluate(() => {
-      const button = document.querySelector(".cover-card.active .cover-delete") || document.querySelector(".cover-delete");
-      button?.click();
-      return true;
+      const buttons = [...document.querySelectorAll(".cover-delete")].filter((button) => button instanceof HTMLElement && button.offsetParent !== null);
+      const button = buttons[0];
+      button?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, view: window }));
+      return Boolean(button);
     });
     await client.waitFor(() => Boolean(document.querySelector(".confirm-dialog")));
     await client.evaluate(() => {
@@ -270,6 +283,7 @@ async function main() {
         "PASS inspiration form submits",
         "PASS book draft is saved",
         "PASS 4 page images are generated",
+        "PASS generated records page shows core and page prompts",
         "PASS shelf renders generated book",
         "PASS delete confirmation opens",
         "PASS generated book deletes from shelf",
