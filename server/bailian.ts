@@ -70,6 +70,10 @@ function inspirationTextModel() {
   return process.env.BAILIAN_INSPIRATION_TEXT_MODEL || process.env.BAILIAN_FAST_TEXT_MODEL || "qwen-turbo";
 }
 
+function inspirationTextTimeoutMs() {
+  return numberFromEnv("BAILIAN_INSPIRATION_TEXT_TIMEOUT_MS", 20000);
+}
+
 function imageModel() {
   return process.env.BAILIAN_IMAGE_MODEL || "wan2.7-image-pro";
 }
@@ -105,6 +109,7 @@ export function getBailianRuntimeStatus() {
     storyTextModel: storyTextModel(),
     storyTextTimeoutMs: storyTextTimeoutMs(),
     inspirationTextModel: inspirationTextModel(),
+    inspirationTextTimeoutMs: inspirationTextTimeoutMs(),
     imageModel: imageModel(),
     imageSize: imageSize()
   };
@@ -115,42 +120,47 @@ export async function generateSeasonalInspirationChips(options: {
   currentIdea?: string;
   existingChips?: string[];
   language?: BookLanguage;
+  randomSeed?: string;
   refreshCount?: number;
 }) {
   const language = options.language || "zh";
   const parsedDate = options.currentDate ? new Date(options.currentDate) : new Date();
   const date = Number.isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
   const contextLabel = getSeasonalContext(date, language);
-  const fallback = fallbackInspirationChips(language, contextLabel, options.currentIdea || "", options.existingChips || []);
+  const fallback = fallbackInspirationChips(language, contextLabel, options.currentIdea || "", options.existingChips || [], options.refreshCount || 1);
 
   if (!hasBailianKey()) {
     return { contextLabel, chips: fallback, source: "local" as const };
   }
 
-  const sceneGuide = buildSceneFirstHeritageGuide(options.currentIdea || contextLabel, language);
+  const randomSeed = options.randomSeed || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const sceneGuide = buildSceneFirstHeritageGuide(options.currentIdea || `${contextLabel}-${randomSeed}`, language);
   const systemPrompt =
     language === "en"
       ? [
           "You are Gui Xiaoya, an inspiration coach for elementary-school Guangxi picture books.",
-          "Create fresh one-sentence story idea chips for children ages 6-12.",
-          "Use the current season or holiday as the emotional hook, then choose Guangxi travel scenes and cultural highlights that naturally fit.",
+          "Every request is a live brainstorming task, not a template rewrite. Create fresh one-sentence story idea chips for children ages 6-12.",
+          "Randomly choose different Guangxi cities, counties, scenic spots, neighborhoods, museums, villages, farms, beaches, mountains, rivers, or old streets.",
+          "Each chip must include one specific Guangxi place and one concrete, playful, different event. Avoid vague culture words.",
           "Avoid repeating famous symbols by default. Do not use Zhuang brocade or bronze drums unless the idea itself clearly needs them.",
           "For Children's Day, treat the context as a refresh point named Children's Day Fun. Include playful child-centered ideas and allow naturally fitting intangible-heritage ideas.",
           "At least 2 chips should include a clear Guangxi intangible heritage or local craft, such as Dong grand song, Beihai shell carving, Tianqin singing, Liubao tea, Maonan flower bamboo hats, Nixing pottery, Huashan rock paintings, or five-color sticky rice.",
           "Use child-friendly hooks such as games, riddles, nature watching, postcards, treasure hunts, songs, or class trips. Avoid romance or love-song wording.",
-          "Cover different Guangxi cities and places such as Baise, Chongzuo, Guilin, Liuzhou, Wuzhou, Beihai, Fangchenggang, Qinzhou, Hezhou, Hechi, and Sanjiang when appropriate.",
+          "The 6 chips should use 6 different Guangxi cities/counties/areas when possible, such as Nanning, Liuzhou, Guilin, Wuzhou, Beihai, Fangchenggang, Qinzhou, Guigang, Yulin, Baise, Hezhou, Hechi, Laibin, Chongzuo, Sanjiang, Rongxian, Longsheng, or Huanjiang.",
           sceneGuide,
           "Output JSON only."
         ].join("\n")
       : [
           "你是桂小雅，负责给小学组孩子设计广西绘本灵感锦囊。",
+          "每次请求都要像现场头脑风暴，不要套用固定模板，也不要只改几个字。",
           "请创作新鲜的一句话儿童小故事灵感，适合 6-12 岁孩子继续做绘本。",
-          "先根据当前时令或节日找情绪钩子，再选择自然贴合的广西文旅场景和文化亮点。",
+          "随机选择不同广西城市、县区、景点、街巷、博物馆、村寨、农田、海滩、山水或老街。",
+          "每条必须同时包含一个具体广西地点和一个具体好玩的事件，避免只写空泛的文化词。",
           "不要默认使用壮锦或铜鼓，除非灵感本身明确需要。",
           "如果是六一前后，请把“六一童趣”当成一个刷新点：每次都要有儿童节游戏感、班级活动感或童话感。",
           "允许并鼓励自然加入非遗相关锦囊；至少 2 条要出现清楚的广西非遗或地方手作，例如侗族大歌、北海贝雕、天琴弹唱、六堡茶、毛南花竹帽、钦州坭兴陶、花山岩画、五色糯米饭等。",
           "故事钩子用游戏、谜题、自然观察、明信片、寻宝、童谣、班级出游等儿童视角，避免爱情或情歌表达。",
-          "尽量覆盖不同广西城市和地点，例如百色、崇左、桂林、柳州、梧州、北海、防城港、钦州、贺州、河池、三江等。",
+          "6 条尽量使用 6 个不同广西城市/县区/片区，例如南宁、柳州、桂林、梧州、北海、防城港、钦州、贵港、玉林、百色、贺州、河池、来宾、崇左、三江、容县、龙胜、环江等。",
           sceneGuide,
           "只输出 JSON。"
         ].join("\n");
@@ -160,36 +170,38 @@ export async function generateSeasonalInspirationChips(options: {
       ? [
           `Current context: ${contextLabel}`,
           `Refresh round: ${options.refreshCount || 1}`,
+          `Random seed for this click: ${randomSeed}`,
           `Current student idea, if any: ${options.currentIdea || "none"}`,
           `Avoid ideas too similar to these existing chips: ${(options.existingChips || []).join(" | ") || "none"}`,
           "Return JSON with fields:",
           "contextLabel: a short seasonal label",
-          "chips: exactly 6 short child-friendly story ideas, each 8-16 English words, diverse in place, cultural highlight, and plot, no numbering.",
-          "At most 1 chip may continue the current student idea. The other 5 must change the place, cultural highlight, and plot hook."
+          "chips: exactly 6 short child-friendly story ideas, each 8-18 English words, no numbering.",
+          "Hard rules: 6 different Guangxi places/cities/counties if possible; each chip needs a place + a different event/action; do not reuse the examples verbatim; at most 1 chip may continue the current student idea."
         ].join("\n")
       : [
           `当前时令：${contextLabel}`,
           `刷新次数：${options.refreshCount || 1}`,
+          `本次点击随机种子：${randomSeed}`,
           `当前孩子写下的灵感：${options.currentIdea || "无"}`,
           `请避开这些已有锦囊的相似表达：${(options.existingChips || []).join(" | ") || "无"}`,
           "请返回 JSON，字段：",
           "contextLabel: 8 字以内的时令标签",
-          "chips: 正好 6 条中文灵感锦囊，每条 10-22 个字，地点、文化亮点、情节尽量不同，不要编号。",
-          "最多 1 条可以延续当前孩子的灵感，其余 5 条必须换地点、换文化亮点、换情节钩子。"
+          "chips: 正好 6 条中文灵感锦囊，每条 10-26 个字，不要编号。",
+          "硬性规则：尽量 6 个不同广西城市/县区/片区；每条都要有具体地点 + 不同事件动作；不要照抄示例；最多 1 条延续当前灵感，其余都必须换地点、换文化亮点、换情节钩子。"
         ].join("\n");
 
   try {
     const content = await chatCompletion([
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt }
-    ], { maxTokens: 520, model: inspirationTextModel(), temperature: 0.95, timeoutMs: 2800 });
+    ], { maxTokens: 520, model: inspirationTextModel(), temperature: 0.95, timeoutMs: inspirationTextTimeoutMs() });
     const parsed = extractJsonValue<InspirationChipResponse>(content);
     const generatedChips = normalizeInspirationChips(parsed.chips || [], language, false)
       .filter((chip) => !isUnsupportedDefaultHeritage(chip, options.currentIdea || contextLabel));
     const chips = pickDiverseInspirationChips(
       generatedChips.concat(fallback),
       options.existingChips || [],
-      `${options.currentIdea || ""}|${contextLabel}|${options.refreshCount || 1}`,
+      `${options.currentIdea || ""}|${contextLabel}|${options.refreshCount || 1}|${randomSeed}`,
       language
     );
     return { contextLabel: parsed.contextLabel || contextLabel, chips, source: "bailian" as const };
@@ -549,7 +561,7 @@ function getSeasonalContext(date = new Date(), language: BookLanguage = "zh") {
   return language === "en" ? "today's season" : "最近的时令";
 }
 
-function fallbackInspirationChips(language: BookLanguage, contextLabel: string, currentIdea = "", existingChips: string[] = []) {
+function fallbackInspirationChips(language: BookLanguage, contextLabel: string, currentIdea = "", existingChips: string[] = [], refreshCount = 1) {
   const childDay = /儿童节|Children|六一|童趣/iu.test(contextLabel);
   const summer = /夏|暑假|summer/iu.test(contextLabel);
   const basePool =
@@ -650,7 +662,7 @@ function fallbackInspirationChips(language: BookLanguage, contextLabel: string, 
               "河池毛南花竹帽找到彩虹路"
             ];
 
-  return pickDiverseInspirationChips(basePool, existingChips, currentIdea, language);
+  return pickDiverseInspirationChips(basePool, existingChips, `${currentIdea}|${contextLabel}|${refreshCount}`, language);
 }
 
 function normalizeInspirationChips(items: string[], language: BookLanguage, shouldLimit = true) {

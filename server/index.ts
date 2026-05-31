@@ -162,11 +162,12 @@ app.post("/api/inspiration-chips", async (request, response, next) => {
     const language = request.body?.language === "en" ? "en" : "zh";
     const currentIdea = String(request.body?.currentIdea || "").trim().slice(0, 120);
     const currentDate = String(request.body?.currentDate || "").trim();
+    const randomSeed = String(request.body?.randomSeed || "").trim().slice(0, 80);
     const refreshCount = Number(request.body?.refreshCount || 1);
     const existingChips = Array.isArray(request.body?.existingChips)
       ? request.body.existingChips.map((chip: unknown) => String(chip || "").trim()).filter(Boolean).slice(0, 12)
       : [];
-    const result = await generateSeasonalInspirationChips({ currentDate, currentIdea, existingChips, language, refreshCount });
+    const result = await generateSeasonalInspirationChips({ currentDate, currentIdea, existingChips, language, randomSeed, refreshCount });
     response.json(result);
   } catch (error) {
     next(error);

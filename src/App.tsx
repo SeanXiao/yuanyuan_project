@@ -120,6 +120,27 @@ const defaultInspirationChips = [
   "钦州坭兴陶小杯接住海浪"
 ];
 
+const localInspirationFallbackPool = [
+  ...defaultInspirationChips,
+  "玉林真武阁楼梯变成云朵迷宫",
+  "河池毛南花竹帽带来六一巡游",
+  "崇左花山岩画小人跳出红色舞步",
+  "贺州黄姚古镇里的皮影寻路任务",
+  "防城港白浪滩上的独弦琴海风音乐会",
+  "百色右江边的红领巾时光信箱",
+  "龙脊梯田云朵里的农耕游戏",
+  "柳州夜市里的文化味道线索",
+  "桂林漓江竹筏收到山歌地图",
+  "青秀山五色糯米饭野餐任务",
+  "北海贝壳邮局寄出海风谜语",
+  "钦州坭兴陶工坊里的雨天救援"
+];
+
+function rotateLocalInspirationChips(refreshCount: number) {
+  const start = Math.abs(refreshCount * 5 + new Date().getMinutes()) % localInspirationFallbackPool.length;
+  return localInspirationFallbackPool.slice(start).concat(localInspirationFallbackPool.slice(0, start)).slice(0, 6);
+}
+
 async function readApiJson<T>(response: Response, emptyMessage = "服务返回内容为空，请稍后再试。") {
   const text = await response.text().catch(() => "");
   const data = text
@@ -708,6 +729,7 @@ export default function App({ embeddedInProduct = false }: { embeddedInProduct?:
   const [inspirationContext, setInspirationContext] = useState("六一童趣");
   const [isDiscoveringInspirations, setIsDiscoveringInspirations] = useState(false);
   const [inspirationRefreshCount, setInspirationRefreshCount] = useState(0);
+  const hasLoadedAiInspirationsRef = useRef(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const workbenchRef = useRef<HTMLElement | null>(null);
   const workbenchBodyRef = useRef<HTMLDivElement | null>(null);
@@ -722,6 +744,14 @@ export default function App({ embeddedInProduct = false }: { embeddedInProduct?:
 
   useEffect(() => {
     void refreshBooks();
+  }, []);
+
+  useEffect(() => {
+    if (hasLoadedAiInspirationsRef.current) {
+      return;
+    }
+    hasLoadedAiInspirationsRef.current = true;
+    void discoverMoreInspirations({ silent: true, useCurrentIdea: false });
   }, []);
 
   useEffect(() => {
@@ -1029,22 +1059,26 @@ export default function App({ embeddedInProduct = false }: { embeddedInProduct?:
     setNotice("灵感已经放到书桌上，可以继续改写或开始做绘本");
   }
 
-  async function discoverMoreInspirations() {
+  async function discoverMoreInspirations(options?: { silent?: boolean; useCurrentIdea?: boolean }) {
     if (isDiscoveringInspirations || isGenerating) {
       return;
     }
 
     setIsDiscoveringInspirations(true);
     const nextRefreshCount = inspirationRefreshCount + 1;
-    setNotice("桂小雅正在刷新六一童趣锦囊，也会挑几条自然贴合的非遗灵感");
+    if (!options?.silent) {
+      setNotice("桂小雅正在向模型寻找新的广西城市、景点和故事事件。");
+    }
     try {
+      const randomSeed = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
       const response = await fetch("/api/inspiration-chips", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           currentDate: new Date().toISOString(),
-          currentIdea: idea.trim(),
+          currentIdea: options?.useCurrentIdea === false ? "" : idea.trim(),
           existingChips: inspirationChips,
+          randomSeed,
           refreshCount: nextRefreshCount,
           language: bookLanguage
         })
@@ -1058,12 +1092,17 @@ export default function App({ embeddedInProduct = false }: { embeddedInProduct?:
       setInspirationChips(nextChips);
       setInspirationRefreshCount(nextRefreshCount);
       setInspirationContext(data.contextLabel || "六一童趣");
-      setNotice(`已刷新${data.contextLabel || "六一童趣"}锦囊，里面也有自然贴合的非遗灵感`);
+      if (!options?.silent) {
+        setNotice(`已刷新${data.contextLabel || "六一童趣"}锦囊，里面也有自然贴合的非遗灵感`);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "灵感锦囊生成失败";
-      setInspirationChips(defaultInspirationChips);
+      setInspirationChips(rotateLocalInspirationChips(nextRefreshCount));
       setInspirationContext("六一童趣");
-      setNotice(`${message}，先用本地灵感锦囊`);
+      setInspirationRefreshCount(nextRefreshCount);
+      if (!options?.silent) {
+        setNotice(`${message}，先用本地灵感锦囊`);
+      }
     } finally {
       setIsDiscoveringInspirations(false);
     }

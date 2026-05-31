@@ -270,12 +270,13 @@ async function main() {
     });
     await client.waitFor(() => Boolean(document.querySelector(".product-classic-desk .left-panel")) && Boolean(document.querySelector(".product-classic-desk .workbench")) && location.hash === "#/desk");
     pass("desk opens");
-    await client.evaluate(() => {
-      const chip = [...document.querySelectorAll(".inspiration-chip-row button")].find((button) => button.textContent.includes("三月三"));
+    const pickedChip = await client.evaluate(() => {
+      const chip = document.querySelector(".inspiration-chip-row button");
+      const text = chip?.textContent?.trim() || "";
       chip?.click();
-      return true;
+      return text;
     });
-    await client.waitFor(() => document.querySelector(".idea-box textarea")?.value.includes("三月三"));
+    await client.waitFor((text) => Boolean(text) && document.querySelector(".idea-box textarea")?.value.includes(text), pickedChip);
     pass("idea chip fills textarea");
     const formState = await client.evaluate(() => {
       [...document.querySelectorAll(".language-switch button")].find((button) => button.textContent.trim() === "English")?.click();
