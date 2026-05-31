@@ -243,8 +243,13 @@ async function main() {
     });
     await client.waitFor(() => {
       const text = document.body.innerText;
-      return Boolean(document.querySelector(".records-page")) && text.includes("核心创建故事提示词") && text.includes("各页故事与插图提示词") ? true : null;
+      return Boolean(document.querySelector(".records-page")) && text.includes("核心创建故事提示词") && document.querySelectorAll(".record-tab-button").length >= 5 ? true : null;
     }, null, 30000);
+    await client.evaluate(() => {
+      [...document.querySelectorAll(".record-tab-button")].find((button) => button.textContent.includes("故事输出"))?.click();
+      return true;
+    });
+    await client.waitFor(() => document.body.innerText.includes("各页故事与插图提示词") && document.querySelectorAll(".record-page-tab").length >= 4, null, 30000);
 
     await client.evaluate(() => {
       [...document.querySelectorAll(".product-nav button")].find((button) => button.textContent.includes("我的书架"))?.click();

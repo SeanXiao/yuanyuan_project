@@ -3,6 +3,8 @@ import type { BookLanguage, ProtagonistGender } from "./types";
 
 let speechRunId = 0;
 let activeAudio: HTMLAudioElement | null = null;
+let resolveActiveAudio: (() => void) | null = null;
+let resolveActiveUtterance: (() => void) | null = null;
 
 function splitSpeechText(text: string) {
   return text
@@ -28,32 +30,48 @@ function playAudio(audioUrl: string, runId: number) {
     }
 
     const audio = new Audio(audioUrl);
-    activeAudio = audio;
-    audio.onended = () => {
+    let settled = false;
+    const settle = (callback: () => void) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
       if (activeAudio === audio) {
         activeAudio = null;
       }
-      resolve();
+      if (resolveActiveAudio === finish) {
+        resolveActiveAudio = null;
+      }
+      callback();
+    };
+    const finish = () => settle(resolve);
+
+    activeAudio = audio;
+    resolveActiveAudio = finish;
+    audio.onended = () => {
+      settle(resolve);
     };
     audio.onerror = () => {
-      if (activeAudio === audio) {
-        activeAudio = null;
-      }
-      reject(new Error("音频播放失败"));
+      settle(() => reject(new Error("音频播放失败")));
     };
-    void audio.play().catch(reject);
+    void audio.play().catch((error) => settle(() => reject(error)));
   });
 }
 
 export function stopProductSpeech() {
   speechRunId += 1;
-  if (activeAudio) {
-    activeAudio.pause();
-    activeAudio.removeAttribute("src");
-    activeAudio.load();
+  const audio = activeAudio;
+  const finishAudio = resolveActiveAudio;
+  if (audio) {
+    audio.pause();
+    audio.removeAttribute("src");
+    audio.load();
     activeAudio = null;
   }
   window.speechSynthesis?.cancel();
+  finishAudio?.();
+  resolveActiveUtterance?.();
+  resolveActiveUtterance = null;
 }
 
 export async function speakProductText(
@@ -99,11 +117,18 @@ export async function speakProductText(
 
     await new Promise<void>((resolve) => {
       const utterance = new SpeechSynthesisUtterance(chunk);
+      const finishUtterance = () => {
+        if (resolveActiveUtterance === finishUtterance) {
+          resolveActiveUtterance = null;
+        }
+        resolve();
+      };
       utterance.lang = language === "en" ? "en-US" : "zh-CN";
       utterance.rate = language === "en" ? 0.98 : 1.08;
       utterance.pitch = 1.03;
-      utterance.onend = () => resolve();
-      utterance.onerror = () => resolve();
+      utterance.onend = finishUtterance;
+      utterance.onerror = finishUtterance;
+      resolveActiveUtterance = finishUtterance;
       window.speechSynthesis.speak(utterance);
     });
   }

@@ -877,7 +877,7 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
       promptRecords: [
         makePromptRecord(
           "story",
-          language === "en" ? "Bailian Story Prompt" : "百炼故事生成 Prompt",
+          language === "en" ? "Guiyun Creator Core Prompt" : "桂韵创想家 核心提示词",
           `${systemPrompt}\n\n${userPrompt}`,
           JSON.stringify(normalized, null, 2)
         ),

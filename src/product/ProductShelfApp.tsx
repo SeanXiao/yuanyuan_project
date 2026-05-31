@@ -3,7 +3,6 @@ import {
   AlertCircle,
   BookOpen,
   ChevronLeft,
-  ChevronRight,
   Clock,
   Edit3,
   ExternalLink,
@@ -37,6 +36,9 @@ import type { BookLanguage, PictureBook, PictureBookPage, PictureBookSummary, Pr
 type ProductView = "shelf" | "desk" | "detail" | "records" | "theater";
 type ImageTaskStatus = "idle" | "running" | "done" | "error";
 type ProductStage = "input" | "analysis" | "content" | "images" | "saved";
+type RecordTabKey = "story" | "pages" | "images" | "system" | "culture";
+type PromptContentTabKey = "prompt" | "output";
+type ReadingMode = "idle" | "page" | "book";
 
 type ProductProgress = {
   active: boolean;
@@ -139,6 +141,33 @@ function getRecordTypeLabel(type: PromptRecord["type"]) {
   return labels[type];
 }
 
+function extractImageSource(text = "") {
+  const clean = text.trim();
+  if (/^(https?:\/\/|\/generated\/|data:image\/|blob:)/iu.test(clean)) {
+    return clean;
+  }
+
+  return clean.match(/(https?:\/\/[^\s"'<>]+|\/generated\/[^\s"'<>]+|data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=]+)/iu)?.[1] || "";
+}
+
+function getPromptRecordPageNumber(record: PromptRecord) {
+  const text = `${record.label}\n${record.prompt}`;
+  const zhMatch = text.match(/第\s*(\d+)\s*页/u);
+  const enMatch = text.match(/\bPage\s*(\d+)\b/iu);
+  const value = Number(zhMatch?.[1] || enMatch?.[1] || 0);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function getPromptRecordPreviewImageUrl(record: PromptRecord, pages: PictureBookPage[] = []) {
+  const outputImage = extractImageSource(record.output);
+  if (outputImage) {
+    return outputImage;
+  }
+
+  const pageNumber = getPromptRecordPageNumber(record);
+  return pages.find((page) => page.pageNumber === pageNumber)?.imageUrl || "";
+}
+
 function cleanSpeechPart(text = "") {
   return text
     .replace(/第\s*\d+\s*页[，,：:\s]*/gu, "")
@@ -146,16 +175,6 @@ function cleanSpeechPart(text = "") {
     .replace(/\s+/gu, " ")
     .trim()
     .replace(/[。！？!?.,，、；;：:]+$/gu, "");
-}
-
-function buildFullReadText(book: PictureBook) {
-  const language = book.language || "zh";
-  const parts = [book.title, ...book.pages.map((page) => page.text), book.tourGuideScript]
-    .map(cleanSpeechPart)
-    .filter(Boolean);
-  const separator = language === "en" ? ". " : "。";
-  const endMark = language === "en" ? "." : "。";
-  return `${parts.join(separator)}${endMark}`;
 }
 
 function buildPageReadText(book: PictureBook, page: PictureBookPage, includeCultureNote = true) {
@@ -235,9 +254,12 @@ export default function ProductShelfApp() {
   const [progress, setProgress] = useState<ProductProgress | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<PictureBookSummary | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
+  const [readingMode, setReadingMode] = useState<ReadingMode>("idle");
+  const [readingPageNumber, setReadingPageNumber] = useState<number | null>(null);
   const creationPanelRef = useRef<HTMLDivElement | null>(null);
   const ideaInputRef = useRef<HTMLTextAreaElement | null>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const readingSessionRef = useRef(0);
   const speechSupported = Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
 
   const displayBooks = useMemo(() => books.map(displayBookSummary), [books]);
@@ -245,7 +267,6 @@ export default function ProductShelfApp() {
   const selectedPageIndex = displayActiveBook ? Math.min(pageIndex, Math.max(displayActiveBook.pages.length - 1, 0)) : 0;
   const rawSelectedPage = activeBook?.pages[selectedPageIndex] || null;
   const selectedPage = displayActiveBook?.pages[selectedPageIndex] || null;
-  const readAllText = useMemo(() => (displayActiveBook ? buildFullReadText(displayActiveBook) : ""), [displayActiveBook]);
   const latestBook = books[0] || null;
 
   useEffect(() => {
@@ -275,6 +296,7 @@ export default function ProductShelfApp() {
   }, [activeBook?.id, routeBookId, view]);
 
   useEffect(() => {
+    stopReading();
     setPageIndex(0);
   }, [activeBook?.id]);
 
@@ -558,58 +580,6 @@ export default function ProductShelfApp() {
     }
   }
 
-  async function regeneratePageImage(pageNumber: number) {
-    if (!activeBook || isGenerating) {
-      return;
-    }
-
-    setIsGenerating(true);
-    setProgress({
-      ...makeProgress("images", `正在重画第 ${pageNumber} 页`, "插图完成后会自动回到这本绘本。", [`第 ${pageNumber} 页开始重画。`]),
-      imageTasks: { ...emptyImageTasks, [pageNumber]: "running" }
-    });
-    try {
-      const nextBook = await generatePictureBookPageImage(activeBook.id, pageNumber);
-      setActiveBook((current) => mergePictureBook(current, nextBook));
-      await refreshBooks();
-      setProgress((current) =>
-        current
-          ? appendProgressLog(
-              {
-                ...current,
-                active: false,
-                stage: "saved",
-                title: `第 ${pageNumber} 页插图已更新`,
-                detail: "新插图已经保存到书架里的绘本。",
-                imageTasks: { ...current.imageTasks, [pageNumber]: "done" }
-              },
-              [`第 ${pageNumber} 页插图已更新。`]
-            )
-          : current
-      );
-      setNotice(`第 ${pageNumber} 页插图已更新。`);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "插图暂时没画好";
-      setProgress((current) =>
-        current
-          ? appendProgressLog(
-              {
-                ...current,
-                active: false,
-                detail: message,
-                error: message,
-                imageTasks: { ...current.imageTasks, [pageNumber]: "error" }
-              },
-              [`第 ${pageNumber} 页重画失败：${message}`]
-            )
-          : current
-      );
-      setNotice(message);
-    } finally {
-      setIsGenerating(false);
-    }
-  }
-
   function requestDeleteBook(book: PictureBookSummary) {
     setDeleteTarget(book);
     setNotice(`请确认是否删除《${displayText(book.title)}》。`);
@@ -695,35 +665,104 @@ export default function ProductShelfApp() {
   }
 
   function goToPage(nextIndex: number) {
-    stopProductSpeech();
+    stopReading();
     if (!activeBook) {
       return;
     }
     setPageIndex(Math.min(activeBook.pages.length - 1, Math.max(0, nextIndex)));
   }
 
+  function startReading(mode: ReadingMode, pageNumber?: number) {
+    readingSessionRef.current += 1;
+    setReadingMode(mode);
+    setReadingPageNumber(pageNumber || null);
+    return readingSessionRef.current;
+  }
+
+  function finishReading(sessionId: number) {
+    if (readingSessionRef.current !== sessionId) {
+      return;
+    }
+    setReadingMode("idle");
+    setReadingPageNumber(null);
+  }
+
+  function stopReading() {
+    readingSessionRef.current += 1;
+    stopProductSpeech();
+    setReadingMode("idle");
+    setReadingPageNumber(null);
+  }
+
+  function getReusablePageAudio(rawBook: PictureBook, rawPage: PictureBookPage, language: BookLanguage) {
+    const rawPageReadText = buildPageReadText(rawBook, rawPage, true);
+    return language === "zh" && rawPageReadText === displayText(rawPageReadText) ? rawPage.speechAudioUrl : undefined;
+  }
+
   function readCurrentPage(languageOverride?: BookLanguage) {
     if (!activeBook || !selectedPage) {
       return;
     }
+    if (readingMode === "page" && readingPageNumber === selectedPage.pageNumber) {
+      stopReading();
+      return;
+    }
     const language = languageOverride || activeBook.language || "zh";
-    const rawPageReadText = rawSelectedPage ? buildPageReadText(activeBook, rawSelectedPage, true) : "";
-    const shouldReuseAudio = language === "zh" && rawPageReadText === displayText(rawPageReadText);
+    const sessionId = startReading("page", selectedPage.pageNumber);
     void speakProductText(
       buildPageReadText(activeBook, selectedPage, true),
       language,
       activeBook.protagonistGender || "girl",
-      shouldReuseAudio ? selectedPage.speechAudioUrl : undefined
-    ).catch(() => setNotice("朗读暂时没有播放成功，可以再点一次试试。"));
+      rawSelectedPage ? getReusablePageAudio(activeBook, rawSelectedPage, language) : undefined
+    )
+      .catch(() => {
+        if (readingSessionRef.current === sessionId) {
+          setNotice("朗读暂时没有播放成功，可以再点一次试试。");
+        }
+      })
+      .finally(() => finishReading(sessionId));
   }
 
   function readFullBook() {
-    if (!activeBook || !readAllText) {
+    if (!activeBook || !displayActiveBook?.pages.length) {
       return;
     }
-    void speakProductText(readAllText, activeBook.language || "zh", activeBook.protagonistGender || "girl").catch(() =>
-      setNotice("朗读暂时没有播放成功，可以再点一次试试。")
-    );
+    if (readingMode === "book") {
+      stopReading();
+      return;
+    }
+    const rawBook = activeBook;
+    const displayBookForReading = displayActiveBook;
+    const language = rawBook.language || "zh";
+    const protagonistGender = rawBook.protagonistGender || "girl";
+    const sessionId = startReading("book", displayBookForReading.pages[0]?.pageNumber);
+
+    void (async () => {
+      try {
+        for (let index = 0; index < displayBookForReading.pages.length; index += 1) {
+          if (readingSessionRef.current !== sessionId) {
+            return;
+          }
+
+          const page = displayBookForReading.pages[index];
+          const rawPage = rawBook.pages[index] || page;
+          setPageIndex(index);
+          setReadingPageNumber(page.pageNumber);
+          await speakProductText(
+            buildPageReadText(displayBookForReading, page, true),
+            language,
+            protagonistGender,
+            getReusablePageAudio(rawBook, rawPage, language)
+          );
+        }
+      } catch {
+        if (readingSessionRef.current === sessionId) {
+          setNotice("朗读暂时没有播放成功，可以再点一次试试。");
+        }
+      } finally {
+        finishReading(sessionId);
+      }
+    })();
   }
 
   const shouldShowProductHeader = view !== "detail" && view !== "theater";
@@ -750,37 +789,9 @@ export default function ProductShelfApp() {
               <Edit3 size={17} />
               我的书桌
             </button>
-            <button
-              type="button"
-              className=""
-              onClick={() => {
-                if (activeBook) {
-                  navigateToBook(activeBook.id, "detail");
-                }
-              }}
-              disabled={!activeBook}
-            >
-              <BookOpen size={17} />
-              绘本
-            </button>
             <button type="button" className={view === "records" ? "active" : ""} onClick={navigateToRecords}>
               <FileText size={17} />
               创作记录
-            </button>
-            <button
-              type="button"
-              className=""
-              onClick={() => {
-                if (activeBook) {
-                  navigateToBook(activeBook.id, "theater");
-                } else {
-                  window.location.hash = "#/theater";
-                }
-              }}
-              disabled={!activeBook}
-            >
-              <Volume2 size={17} />
-              绘本剧场
             </button>
           </nav>
         </header>
@@ -877,8 +888,8 @@ export default function ProductShelfApp() {
           onGoToPage={goToPage}
           onReadCurrentPage={readCurrentPage}
           onReadFullBook={readFullBook}
-          onRegeneratePage={regeneratePageImage}
-          isGenerating={isGenerating}
+          readingMode={readingMode}
+          readingPageNumber={readingPageNumber}
         />
       </section>
       ) : null}
@@ -902,6 +913,8 @@ export default function ProductShelfApp() {
           onGoToPage={goToPage}
           onReadCurrentPage={readCurrentPage}
           onReadFullBook={readFullBook}
+          readingMode={readingMode}
+          readingPageNumber={readingPageNumber}
         />
       ) : null}
 
@@ -1166,8 +1179,8 @@ function ReaderWorkspace({
   onGoToPage,
   onReadCurrentPage,
   onReadFullBook,
-  onRegeneratePage,
-  isGenerating
+  readingMode,
+  readingPageNumber
 }: {
   activeBook: PictureBook | null;
   selectedPage: PictureBookPage | null;
@@ -1179,8 +1192,8 @@ function ReaderWorkspace({
   onGoToPage: (pageIndex: number) => void;
   onReadCurrentPage: (languageOverride?: BookLanguage) => void;
   onReadFullBook: () => void;
-  onRegeneratePage: (pageNumber: number) => Promise<void>;
-  isGenerating: boolean;
+  readingMode: ReadingMode;
+  readingPageNumber: number | null;
 }) {
   if (!activeBook) {
     return (
@@ -1193,8 +1206,9 @@ function ReaderWorkspace({
   }
 
   const language = activeBook.language || "zh";
-  const pageCount = activeBook.pages.length;
   const taskStatus = selectedPage ? imageTasks?.[selectedPage.pageNumber] || "idle" : "idle";
+  const isReadingFullBook = readingMode === "book";
+  const isReadingCurrentPage = readingMode === "page" && readingPageNumber === selectedPage?.pageNumber;
 
   return (
     <section className={`reader-workspace ${view === "detail" ? "is-active" : ""}`}>
@@ -1209,9 +1223,14 @@ function ReaderWorkspace({
             <ChevronLeft size={17} />
             返回书架
           </button>
-          <button className="soft-button" type="button" onClick={onReadFullBook}>
-            <Volume2 size={17} />
-            朗读全书
+          <button
+            className={`soft-button reading-button ${isReadingFullBook ? "is-reading" : ""}`}
+            type="button"
+            onClick={onReadFullBook}
+            aria-pressed={isReadingFullBook}
+          >
+            {isReadingFullBook ? <LoaderCircle className="spinner-icon" size={17} /> : <Volume2 size={17} />}
+            {isReadingFullBook ? "停止朗读" : "朗读全书"}
           </button>
           <button className="soft-button" type="button" onClick={() => onSetView("records")}>
             <FileText size={17} />
@@ -1227,9 +1246,6 @@ function ReaderWorkspace({
       {selectedPage ? (
         <div className="reader-book-layout">
           <div className="open-book">
-            <button className="page-turn left" type="button" onClick={() => onGoToPage(selectedPageIndex - 1)} disabled={selectedPageIndex === 0}>
-              <ChevronLeft size={22} />
-            </button>
             <div className="book-page image-page">
               {selectedPage.imageUrl ? (
                 <img src={selectedPage.imageUrl} alt={`${activeBook.title} 第 ${selectedPage.pageNumber} 页`} />
@@ -1248,29 +1264,17 @@ function ReaderWorkspace({
                 <span>{selectedPage.cultureNote}</span>
               </div>
               <div className="reader-actions">
-                <button className="soft-button" type="button" onClick={() => onReadCurrentPage()}>
-                  <Volume2 size={16} />
-                  听这一页
-                </button>
                 <button
-                  className="soft-button"
+                  className={`soft-button reading-button ${isReadingCurrentPage ? "is-reading" : ""}`}
                   type="button"
-                  onClick={() => void onRegeneratePage(selectedPage.pageNumber)}
-                  disabled={taskStatus === "running" || isGenerating}
+                  onClick={() => onReadCurrentPage()}
+                  aria-pressed={isReadingCurrentPage}
                 >
-                  {taskStatus === "running" ? <LoaderCircle size={16} /> : <RefreshCw size={16} />}
-                  换一张插图
+                  {isReadingCurrentPage ? <LoaderCircle className="spinner-icon" size={16} /> : <Volume2 size={16} />}
+                  {isReadingCurrentPage ? "停止朗读" : "听这一页"}
                 </button>
               </div>
             </article>
-            <button
-              className="page-turn right"
-              type="button"
-              onClick={() => onGoToPage(selectedPageIndex + 1)}
-              disabled={selectedPageIndex >= pageCount - 1}
-            >
-              <ChevronRight size={22} />
-            </button>
           </div>
 
           <div className="page-strip" aria-label="绘本页面">
@@ -1311,6 +1315,23 @@ function RecordsLibrary({
   const imageRecords = records.filter((record) => record.type === "image");
   const cultureRecords = records.filter((record) => record.type === "culture");
   const systemRecords = records.filter((record) => record.type === "system");
+  const [activeRecordTab, setActiveRecordTab] = useState<RecordTabKey>("story");
+  const [activeRecordPage, setActiveRecordPage] = useState(1);
+  const recordTabs: Array<{ key: RecordTabKey; label: string; count: number; unit: string }> = activeBook
+    ? [
+        { key: "story", label: "故事提示词", count: storyRecords.length, unit: "条" },
+        { key: "pages", label: "故事输出", count: activeBook.pages.length, unit: "页" },
+        { key: "images", label: "插图记录", count: imageRecords.length, unit: "条" },
+        { key: "system", label: "系统记录", count: systemRecords.length, unit: "条" },
+        { key: "culture", label: "文化讲解", count: cultureRecords.length, unit: "条" }
+      ]
+    : [];
+  const selectedStoryPage = activeBook?.pages.find((page) => page.pageNumber === activeRecordPage) || activeBook?.pages[0];
+
+  useEffect(() => {
+    setActiveRecordTab("story");
+    setActiveRecordPage(activeBook?.pages[0]?.pageNumber || 1);
+  }, [activeBook?.id, activeBook?.pages]);
 
   return (
     <section className="records-page">
@@ -1391,38 +1412,91 @@ function RecordsLibrary({
                 </div>
               </article>
 
-              <PromptGroup title="核心创建故事提示词" description="生成标题、4 页故事、小百科、讲解词时使用的主提示词。" records={storyRecords} />
-              <PromptGroup title="系统与核心记录" description="包括模型调用失败、备用生成等系统层记录。" records={systemRecords} emptyText="这本绘本没有额外系统记录。" />
-
-              <section className="story-output-panel">
-                <div className="mini-head">
-                  <div>
-                    <p className="product-eyebrow">故事输出</p>
-                    <h3>各页故事与插图提示词</h3>
-                  </div>
-                  <span>{activeBook.pages.length} 页</span>
-                </div>
-                <div className="story-output-grid">
-                  {activeBook.pages.map((page) => (
-                    <article className="story-output-card" key={page.pageNumber}>
-                      <div className="page-number-pill">第 {page.pageNumber} 页</div>
-                      <h4>{page.title}</h4>
-                      <p>{page.text}</p>
-                      <div className="prompt-block">
-                        <span>本页插图提示词</span>
-                        <pre>{page.imagePrompt}</pre>
-                      </div>
-                      <div className="prompt-block">
-                        <span>文化小百科</span>
-                        <pre>{page.cultureNote}</pre>
-                      </div>
-                    </article>
+              <section className="records-tab-shell">
+                <div className="records-tabs" role="tablist" aria-label="创作记录分类">
+                  {recordTabs.map((tab) => (
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={activeRecordTab === tab.key}
+                      aria-controls={`record-panel-${tab.key}`}
+                      id={`record-tab-${tab.key}`}
+                      className={`record-tab-button ${activeRecordTab === tab.key ? "active" : ""}`}
+                      key={tab.key}
+                      onClick={() => setActiveRecordTab(tab.key)}
+                    >
+                      <span>{tab.label}</span>
+                      <small>
+                        {tab.count} {tab.unit}
+                      </small>
+                    </button>
                   ))}
                 </div>
-              </section>
 
-              <PromptGroup title="各次插图生成提示词" description="每页初始图片 Prompt、重画 Prompt 和实际图片生成记录。" records={imageRecords} />
-              <PromptGroup title="文化与讲解记录" description="小百科、讲解词和其他文化说明相关记录。" records={cultureRecords} emptyText="这本绘本没有单独的文化记录。" />
+                <div className="records-tab-panel" id={`record-panel-${activeRecordTab}`} role="tabpanel" aria-labelledby={`record-tab-${activeRecordTab}`}>
+                  {activeRecordTab === "story" ? (
+                    <PromptGroup title="核心创建故事提示词" description="生成标题、4 页故事、小百科、讲解词时使用的主提示词。" records={storyRecords} />
+                  ) : null}
+
+                  {activeRecordTab === "pages" ? (
+                    <section className="story-output-panel">
+                      <div className="mini-head">
+                        <div>
+                          <p className="product-eyebrow">故事输出</p>
+                          <h3>各页故事与插图提示词</h3>
+                        </div>
+                        <span>{activeBook.pages.length} 页</span>
+                      </div>
+                      <div className="record-page-tabs" role="tablist" aria-label="故事页面">
+                        {activeBook.pages.map((page) => (
+                          <button
+                            type="button"
+                            role="tab"
+                            aria-selected={selectedStoryPage?.pageNumber === page.pageNumber}
+                            className={`record-page-tab ${selectedStoryPage?.pageNumber === page.pageNumber ? "active" : ""}`}
+                            key={page.pageNumber}
+                            onClick={() => setActiveRecordPage(page.pageNumber)}
+                          >
+                            第 {page.pageNumber} 页
+                          </button>
+                        ))}
+                      </div>
+                      {selectedStoryPage ? (
+                        <article className="story-output-card story-output-card-single">
+                          <div className="page-number-pill">第 {selectedStoryPage.pageNumber} 页</div>
+                          <h4>{selectedStoryPage.title}</h4>
+                          <p>{selectedStoryPage.text}</p>
+                          <div className="prompt-block">
+                            <span>本页插图提示词</span>
+                            <pre>{selectedStoryPage.imagePrompt}</pre>
+                          </div>
+                          <div className="prompt-block">
+                            <span>文化小百科</span>
+                            <pre>{selectedStoryPage.cultureNote}</pre>
+                          </div>
+                        </article>
+                      ) : (
+                        <div className="record-empty compact">
+                          <FileText size={24} />
+                          <p>这本绘本还没有页面。</p>
+                        </div>
+                      )}
+                    </section>
+                  ) : null}
+
+                  {activeRecordTab === "images" ? (
+                    <PromptGroup title="各次插图生成提示词" description="每页初始图片 Prompt、重画 Prompt 和实际图片生成记录。" records={imageRecords} imagePreviewPages={activeBook.pages} />
+                  ) : null}
+
+                  {activeRecordTab === "system" ? (
+                    <PromptGroup title="系统与核心记录" description="包括模型调用失败、备用生成等系统层记录。" records={systemRecords} emptyText="这本绘本没有额外系统记录。" />
+                  ) : null}
+
+                  {activeRecordTab === "culture" ? (
+                    <PromptGroup title="文化与讲解记录" description="小百科、讲解词和其他文化说明相关记录。" records={cultureRecords} emptyText="这本绘本没有单独的文化记录。" />
+                  ) : null}
+                </div>
+              </section>
             </>
           ) : (
             <div className="record-empty records-empty-state">
@@ -1441,13 +1515,17 @@ function PromptGroup({
   title,
   description,
   records,
+  imagePreviewPages,
   emptyText = "还没有这类记录。"
 }: {
   title: string;
   description: string;
   records: PromptRecord[];
+  imagePreviewPages?: PictureBookPage[];
   emptyText?: string;
 }) {
+  const shouldShowImagePreview = typeof imagePreviewPages !== "undefined";
+
   return (
     <section className="prompt-group">
       <div className="mini-head">
@@ -1461,23 +1539,12 @@ function PromptGroup({
       {records.length ? (
         <div className="prompt-card-list">
           {records.map((record) => (
-            <article className="prompt-card" key={record.id}>
-              <div className="record-card-head">
-                <span>{getRecordTypeLabel(record.type)}</span>
-                <small>{formatRecordTime(record.createdAt)}</small>
-              </div>
-              <h4>{record.label}</h4>
-              <div className="prompt-copy-grid">
-                <div className="prompt-block">
-                  <span>提示词</span>
-                  <pre>{record.prompt}</pre>
-                </div>
-                <div className="prompt-block">
-                  <span>输出结果</span>
-                  <pre>{record.output}</pre>
-                </div>
-              </div>
-            </article>
+            <PromptRecordCard
+              record={record}
+              showImagePreview={shouldShowImagePreview}
+              previewImageUrl={shouldShowImagePreview ? getPromptRecordPreviewImageUrl(record, imagePreviewPages) : ""}
+              key={record.id}
+            />
           ))}
         </div>
       ) : (
@@ -1490,6 +1557,60 @@ function PromptGroup({
   );
 }
 
+function PromptRecordCard({ record, previewImageUrl = "", showImagePreview = false }: { record: PromptRecord; previewImageUrl?: string; showImagePreview?: boolean }) {
+  const [activeContentTab, setActiveContentTab] = useState<PromptContentTabKey>("prompt");
+  const activeContent = activeContentTab === "prompt" ? record.prompt : record.output;
+
+  return (
+    <article className={`prompt-card ${showImagePreview ? "has-image-preview" : ""}`}>
+      <div className="record-card-head">
+        <span>{getRecordTypeLabel(record.type)}</span>
+        <small>{formatRecordTime(record.createdAt)}</small>
+      </div>
+      <h4>{record.label}</h4>
+      <div className="prompt-card-body">
+        <div className="prompt-card-main">
+          <div className="prompt-content-tabs" role="tablist" aria-label={`${record.label}内容`}>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeContentTab === "prompt"}
+              aria-controls={`prompt-content-${record.id}`}
+              className={`prompt-content-tab ${activeContentTab === "prompt" ? "active" : ""}`}
+              onClick={() => setActiveContentTab("prompt")}
+            >
+              提示词
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeContentTab === "output"}
+              aria-controls={`prompt-content-${record.id}`}
+              className={`prompt-content-tab ${activeContentTab === "output" ? "active" : ""}`}
+              onClick={() => setActiveContentTab("output")}
+            >
+              输出结果
+            </button>
+          </div>
+          <div className="prompt-content-panel prompt-block" id={`prompt-content-${record.id}`} role="tabpanel">
+            <pre>{activeContent}</pre>
+          </div>
+        </div>
+
+        {showImagePreview ? (
+          <figure className="prompt-image-preview">
+            <span>对应插图</span>
+            <div className="prompt-image-frame">
+              {previewImageUrl ? <img src={previewImageUrl} alt={`${record.label}插图预览`} /> : <ImageIcon size={32} />}
+            </div>
+            {!previewImageUrl ? <figcaption>这条记录还没有生成图片</figcaption> : null}
+          </figure>
+        ) : null}
+      </div>
+    </article>
+  );
+}
+
 function TheaterWorkspace({
   activeBook,
   selectedPage,
@@ -1497,7 +1618,9 @@ function TheaterWorkspace({
   onBackToShelf,
   onGoToPage,
   onReadCurrentPage,
-  onReadFullBook
+  onReadFullBook,
+  readingMode,
+  readingPageNumber
 }: {
   activeBook: PictureBook | null;
   selectedPage: PictureBookPage | null;
@@ -1506,6 +1629,8 @@ function TheaterWorkspace({
   onGoToPage: (pageIndex: number) => void;
   onReadCurrentPage: (languageOverride?: BookLanguage) => void;
   onReadFullBook: () => void;
+  readingMode: ReadingMode;
+  readingPageNumber: number | null;
 }) {
   const [theaterMode, setTheaterMode] = useState<"showcase" | "self">("showcase");
 
@@ -1515,6 +1640,8 @@ function TheaterWorkspace({
 
   const language = activeBook.language || "zh";
   const currentReadLabel = language === "en" ? "English" : "中文朗读";
+  const isReadingFullBook = readingMode === "book";
+  const isReadingCurrentPage = readingMode === "page" && readingPageNumber === selectedPage.pageNumber;
 
   return (
     <section className="theater-workspace">
@@ -1544,12 +1671,23 @@ function TheaterWorkspace({
               <ChevronLeft size={17} />
               返回书架
             </button>
-            <button className="strong-button" type="button" onClick={onReadFullBook}>
-              <Volume2 size={17} />
-              朗读全书
+            <button
+              className={`strong-button reading-button ${isReadingFullBook ? "is-reading" : ""}`}
+              type="button"
+              onClick={onReadFullBook}
+              aria-pressed={isReadingFullBook}
+            >
+              {isReadingFullBook ? <LoaderCircle className="spinner-icon" size={17} /> : <Volume2 size={17} />}
+              {isReadingFullBook ? "停止朗读" : "朗读全书"}
             </button>
-            <button className="soft-button" type="button" onClick={() => onReadCurrentPage(language)}>
-              {currentReadLabel}
+            <button
+              className={`soft-button reading-button ${isReadingCurrentPage ? "is-reading" : ""}`}
+              type="button"
+              onClick={() => onReadCurrentPage(language)}
+              aria-pressed={isReadingCurrentPage}
+            >
+              {isReadingCurrentPage ? <LoaderCircle className="spinner-icon" size={16} /> : <Volume2 size={16} />}
+              {isReadingCurrentPage ? "停止朗读" : currentReadLabel}
             </button>
           </div>
           <div className="theater-dots">

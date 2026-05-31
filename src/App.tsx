@@ -3,14 +3,11 @@ import {
   AlertCircle,
   BookOpen,
   Bot,
-  ChevronLeft,
-  ChevronRight,
   CheckCircle2,
   Clock,
   ExternalLink,
   FileText,
-  Home,
-  Image,
+  Image as ImageIcon,
   LoaderCircle,
   Mic,
   MicOff,
@@ -97,15 +94,6 @@ type GenerationProgress = {
   error?: string;
 };
 
-type AppRoute =
-  | {
-      mode: "studio";
-    }
-  | {
-      mode: "player";
-      bookId: string;
-    };
-
 const stageLabels: Record<ProgressStage, string> = {
   understanding: "写下灵感",
   story: "整理故事",
@@ -133,7 +121,7 @@ const defaultInspirationChips = [
 ];
 
 const englishDisplayTerms: Record<string, string> = {
-  桂小灵: "Gui Xiaoling",
+  桂小雅: "Gui Xiaoya",
   "是广西文化元素，适合和相关地点、人物或行动自然连在一起。": " is a Guangxi local highlight. Use it when it naturally connects with the place, characters, or action.",
   "是广西文化元素": " is a Guangxi local highlight",
   壮族绣球: "Zhuang embroidered ball",
@@ -220,16 +208,8 @@ function localizeEnglishDisplayText(text: string, language: BookLanguage = "zh")
     .reduce((current, [source, target]) => current.split(source).join(target), text);
 }
 
-function getAppRoute(): AppRoute {
-  const playMatch = window.location.hash.match(/^#\/play\/([^/?#]+)/u);
-  if (playMatch?.[1]) {
-    return { mode: "player", bookId: decodeURIComponent(playMatch[1]) };
-  }
-  return { mode: "studio" };
-}
-
-function getPlayerHref(bookId: string) {
-  return `#/play/${encodeURIComponent(bookId)}`;
+function getBookDetailHref(bookId: string) {
+  return `#/book/${encodeURIComponent(bookId)}`;
 }
 
 function getBrowserVoices(): Promise<SpeechSynthesisVoice[]> {
@@ -463,6 +443,8 @@ function formatDate(value: string) {
 
 function softenDisplayText(text = "") {
   return text
+    .replace(/桂小灵/gu, "桂小雅")
+    .replace(/Gui Xiaoling/giu, "Gui Xiaoya")
     .replace(/\b(undefined|null|nan)\b/giu, "")
     .replace(/未定义/gu, "")
     .replace(/和\s*([。！？!?；;，,])/gu, "$1")
@@ -472,10 +454,10 @@ function softenDisplayText(text = "") {
     .replace(/故事生成\s*Prompt/giu, "故事灵感整理")
     .replace(/\bPrompt\b/giu, "灵感说明")
     .replace(/AI\s*生成内容约\s*\d+%/giu, "故事内容已整理")
-    .replace(/AI\s*生成/giu, "桂小灵整理")
+    .replace(/AI\s*生成/giu, "桂小雅整理")
     .replace(/AI\s*追问/giu, "灵感小问题")
-    .replace(/AI\s*小助手|AI\s*助手/giu, "桂小灵")
-    .replace(/\bAI\b/giu, "桂小灵")
+    .replace(/AI\s*小助手|AI\s*助手/giu, "桂小雅")
+    .replace(/\bAI\b/giu, "桂小雅")
     .replace(/并行/gu, "一起")
     .replace(/生成率/gu, "完成度")
     .replace(/生成图片/gu, "绘制插图")
@@ -495,7 +477,7 @@ function displayBookText(text = "", language: BookLanguage = "zh") {
 
 function softenRecordText(text = "") {
   return softenDisplayText(text)
-    .replace(/百炼/gu, "桂小灵")
+    .replace(/百炼/gu, "桂小雅")
     .replace(/OpenAI/giu, "创作伙伴")
     .replace(/DashScope/giu, "创作伙伴")
     .replace(/system/giu, "创作设定")
@@ -645,7 +627,7 @@ const stageActivityLines: Record<ProgressStage, string[]> = {
   ],
   prompts: [
     "正在把故事页整理成插图提示。",
-    "正在锁定主角外观、桂小灵造型和统一画风。",
+    "正在锁定主角外观、桂小雅造型和统一画风。",
     "正在清理插图提示里的文字内容，避免文字被画进图片。"
   ],
   images: [
@@ -686,11 +668,10 @@ function makeProgress(
 }
 
 export default function App({ embeddedInProduct = false }: { embeddedInProduct?: boolean } = {}) {
-  const [route, setRoute] = useState<AppRoute>(() => getAppRoute());
   const [idea, setIdea] = useState("我想写一个小朋友在三月三歌圩上遇到会唱山歌的绣球。");
   const [books, setBooks] = useState<PictureBookSummary[]>([]);
   const [activeBook, setActiveBook] = useState<PictureBook | null>(null);
-  const [notice, setNotice] = useState("写下一句灵感，桂小灵陪你做一本广西文化绘本");
+  const [notice, setNotice] = useState("写下一句灵感，桂小雅陪你做一本广西文化绘本");
   const [isGenerating, setIsGenerating] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [shouldGenerateImage, setShouldGenerateImage] = useState(true);
@@ -711,28 +692,12 @@ export default function App({ embeddedInProduct = false }: { embeddedInProduct?:
     if (embeddedInProduct) {
       return;
     }
-    document.title = route.mode === "player" ? "桂小灵绘本剧场 - 肖予曦开发" : "桂小灵绘本工坊 - 肖予曦开发";
-  }, [embeddedInProduct, route.mode]);
-
-  useEffect(() => {
-    const handleHashChange = () => setRoute(getAppRoute());
-    window.addEventListener("hashchange", handleHashChange);
-    return () => window.removeEventListener("hashchange", handleHashChange);
-  }, []);
+    document.title = "桂小雅绘本工坊 - 肖予曦开发";
+  }, [embeddedInProduct]);
 
   useEffect(() => {
     void refreshBooks();
   }, []);
-
-  useEffect(() => {
-    if (route.mode !== "player" || activeBook?.id === route.bookId) {
-      return;
-    }
-    void loadBook(route.bookId, { silent: true }).catch((error) => {
-      const message = error instanceof Error ? error.message : "绘本剧场打开失败";
-      setNotice(message);
-    });
-  }, [activeBook?.id, route]);
 
   useEffect(() => {
     if (!generationProgress?.active) {
@@ -838,12 +803,12 @@ export default function App({ embeddedInProduct = false }: { embeddedInProduct?:
       makeProgress(
         "understanding",
         "正在把灵感写进故事本",
-        "桂小灵正在找主角、广西文化亮点和旅行地点。",
+        "桂小雅正在找主角、广西文化亮点和旅行地点。",
         emptyImageTasks,
         makeGenerationLog(cleanIdea, bookLanguage)
       )
     );
-    setNotice("桂小灵正在读你的灵感，马上开始整理故事");
+    setNotice("桂小雅正在读你的灵感，马上开始整理故事");
     try {
       setGenerationProgress((current) =>
         current
@@ -852,7 +817,7 @@ export default function App({ embeddedInProduct = false }: { embeddedInProduct?:
                 ...current,
                 stage: "story",
                 title: "正在整理故事",
-                detail: "桂小灵正在整理标题、4 页故事、文化小百科和小学生讲解词。"
+                detail: "桂小雅正在整理标题、4 页故事、文化小百科和小学生讲解词。"
               },
               ["开始整理标题、4 页故事、文化小百科和小学生讲解词。"]
             )
@@ -900,14 +865,14 @@ export default function App({ embeddedInProduct = false }: { embeddedInProduct?:
                   ...current,
                   stage: "images",
                   title: "正在为故事页绘制插图",
-                  detail: "桂小灵会把 4 个故事页一页页画好，完成后自动放回绘本。",
+                  detail: "桂小雅会把 4 个故事页一页页画好，完成后自动放回绘本。",
                   imageTasks: runningTasks
                 },
                 ["4 页插图任务已排队，正在同时绘制。"]
               )
             : current
         );
-        setNotice("故事已经整理好，桂小灵正在绘制插图");
+        setNotice("故事已经整理好，桂小雅正在绘制插图");
 
         const results = await Promise.allSettled(
           data.book.pages.map((page) => generateImageForBook(data.book!.id, page.pageNumber, "batch"))
@@ -981,7 +946,7 @@ export default function App({ embeddedInProduct = false }: { embeddedInProduct?:
             {
               ...current,
               stage: "images",
-              title: mode === "batch" ? "正在为故事页绘制插图" : `桂小灵正在画第 ${pageNumber} 页`,
+              title: mode === "batch" ? "正在为故事页绘制插图" : `桂小雅正在画第 ${pageNumber} 页`,
               detail: `第 ${pageNumber} 页插图马上就好啦。`,
               imageTasks: { ...current.imageTasks, [pageNumber]: "running" }
             },
@@ -1013,7 +978,7 @@ export default function App({ embeddedInProduct = false }: { embeddedInProduct?:
         ? appendActivityLog(
             {
               ...current,
-              detail: `第 ${pageNumber} 页插图已经放进绘本，桂小灵继续整理其他页面。`,
+              detail: `第 ${pageNumber} 页插图已经放进绘本，桂小雅继续整理其他页面。`,
               imageTasks: { ...current.imageTasks, [pageNumber]: "done" }
             },
             [`第 ${pageNumber} 页：插图已保存到绘本。`]
@@ -1021,59 +986,6 @@ export default function App({ embeddedInProduct = false }: { embeddedInProduct?:
         : current
     );
     return data.book;
-  }
-
-  async function generatePageImage(pageNumber: number) {
-    if (!activeBook) {
-      return;
-    }
-
-    setIsGenerating(true);
-    setGenerationProgress(
-      makeProgress("images", `桂小灵正在画第 ${pageNumber} 页`, `第 ${pageNumber} 页插图马上就好啦。`, {
-        ...emptyImageTasks,
-        [pageNumber]: "running"
-      }, [`准备重画第 ${pageNumber} 页插图。`])
-    );
-    setNotice(`桂小灵正在为第 ${pageNumber} 页绘制插图`);
-    try {
-      await generateImageForBook(activeBook.id, pageNumber, "single");
-      await refreshBooks();
-      setGenerationProgress((current) =>
-        current
-          ? appendActivityLog(
-              {
-                ...current,
-                active: false,
-                stage: "archive",
-                title: `第 ${pageNumber} 页插图已更新`,
-                detail: "插图已保存到我的绘本书架，可以继续换其他页面。"
-              },
-              [`第 ${pageNumber} 页插图更新完成。`]
-            )
-          : current
-      );
-      setNotice("插图已更新");
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "插图暂时没画好";
-      setGenerationProgress((current) =>
-        current
-          ? appendActivityLog(
-              {
-                ...current,
-                active: false,
-                title: "这一页暂时没画好",
-                detail: message,
-                error: message
-              },
-              [`第 ${pageNumber} 页插图遇到问题：${message}`]
-            )
-          : current
-      );
-      setNotice(message);
-    } finally {
-      setIsGenerating(false);
-    }
   }
 
   async function deleteBook(id: string) {
@@ -1099,7 +1011,7 @@ export default function App({ embeddedInProduct = false }: { embeddedInProduct?:
 
     setIsDiscoveringInspirations(true);
     const nextRefreshCount = inspirationRefreshCount + 1;
-    setNotice("桂小灵正在刷新六一童趣锦囊，也会挑几条自然贴合的非遗灵感");
+    setNotice("桂小雅正在刷新六一童趣锦囊，也会挑几条自然贴合的非遗灵感");
     try {
       const response = await fetch("/api/inspiration-chips", {
         method: "POST",
@@ -1180,19 +1092,15 @@ export default function App({ embeddedInProduct = false }: { embeddedInProduct?:
 
   const readText = activeBook ? buildReadText(activeBook) : "";
 
-  if (route.mode === "player") {
-    return <PictureBookPlayer book={activeBook?.id === route.bookId ? activeBook : null} />;
-  }
-
   return (
     <main className={`app-shell ${embeddedInProduct ? "is-product-embedded" : ""}`}>
       <section className="studio-layout">
         <aside className="left-panel">
           <div className="mascot-stage">
-            <img src={companionRobot} alt="桂小灵" />
+            <img src={companionRobot} alt="桂小雅" />
             <div className="mascot-badge">
               <Bot size={16} />
-              <span>{isGenerating ? "桂小灵正在整理故事页" : "桂小灵陪你做绘本"}</span>
+              <span>{isGenerating ? "桂小雅正在整理故事页" : "桂小雅陪你做绘本"}</span>
             </div>
           </div>
 
@@ -1341,8 +1249,8 @@ export default function App({ embeddedInProduct = false }: { embeddedInProduct?:
         <section className="workbench" ref={workbenchRef}>
           <header className="topbar">
             <div>
-              <p className="eyebrow">桂小灵绘本工坊</p>
-              <h2>{activeBook ? displayBookText(activeBook.title, activeBook.language || "zh") : "桂小灵的绘本工坊"}</h2>
+              <p className="eyebrow">桂小雅绘本工坊</p>
+              <h2>{activeBook ? displayBookText(activeBook.title, activeBook.language || "zh") : "桂小雅的绘本工坊"}</h2>
             </div>
             <div className="topbar-actions">
               <button
@@ -1357,9 +1265,9 @@ export default function App({ embeddedInProduct = false }: { embeddedInProduct?:
                 {activeBook?.language === "en" ? "Read Book" : "朗读绘本"}
               </button>
               {activeBook ? (
-                <a className="primary-button" href={getPlayerHref(activeBook.id)} target="_blank" rel="noreferrer">
+                <a className="primary-button" href={getBookDetailHref(activeBook.id)}>
                   <ExternalLink size={18} />
-                  {activeBook.language === "en" ? "Open Storybook" : "打开故事书"}
+                  {activeBook.language === "en" ? "Read Picture Book" : "开始读绘本"}
                 </a>
               ) : null}
               <button className="secondary-button" type="button" onClick={() => setActiveTab(activeTab === "book" ? "prompts" : "book")} disabled={!activeBook}>
@@ -1387,7 +1295,11 @@ export default function App({ embeddedInProduct = false }: { embeddedInProduct?:
             ) : null}
             {activeBook ? (
               activeTab === "book" ? (
-                <BookView book={activeBook} onGenerateImage={generatePageImage} imageTasks={generationProgress?.imageTasks} />
+                <BookView
+                  book={activeBook}
+                  onGenerateImage={(pageNumber) => generateImageForBook(activeBook.id, pageNumber, "single")}
+                  imageTasks={generationProgress?.imageTasks}
+                />
               ) : (
                 <PromptView records={activeBook.promptRecords} language={activeBook.language || "zh"} />
               )
@@ -1395,7 +1307,7 @@ export default function App({ embeddedInProduct = false }: { embeddedInProduct?:
               <section className="empty-workbench">
                 <Paintbrush size={42} />
                 <h2>从一句灵感开始</h2>
-                <p>输入或说出一个广西文化旅行故事，桂小灵会帮你整理成 4 页绘本、插图和小小讲解词。</p>
+                <p>输入或说出一个广西文化旅行故事，桂小雅会帮你整理成 4 页绘本、插图和小小讲解词。</p>
               </section>
             )}
           </div>
@@ -1508,16 +1420,16 @@ function getBookViewCopy(language: BookLanguage) {
     return {
       heroEyebrow: "Story Ready",
       readLink: "Read Picture Book",
-      questionsTitle: "Gui Xiaoling's Questions",
+      questionsTitle: "Gui Xiaoya's Questions",
       outlineTitle: "My Story Route",
       guideTitle: "Little Travel Guide",
       reflectionTitle: "My Creation Note",
       discoveryLabel: "Mini Encyclopedia",
-      drawingButton: "Gui Xiaoling is drawing",
+      drawingButton: "Gui Xiaoya is drawing",
       redrawButton: "Try Another Illustration",
       drawButton: "Draw This Page",
       waitingImage: "This page is waiting for an illustration",
-      drawingImage: "Gui Xiaoling is drawing this page...",
+      drawingImage: "Gui Xiaoya is drawing this page...",
       pageLabel: (pageNumber: number) => `Page ${pageNumber}`,
       imageAlt: (pageNumber: number) => `Page ${pageNumber} illustration`
     };
@@ -1526,52 +1438,18 @@ function getBookViewCopy(language: BookLanguage) {
   return {
     heroEyebrow: "故事内容已整理",
     readLink: "开始读绘本",
-    questionsTitle: "桂小灵的小问题",
+    questionsTitle: "桂小雅的小问题",
     outlineTitle: "我的故事路线",
     guideTitle: "小小文旅推荐官",
     reflectionTitle: "我的创作小记",
     discoveryLabel: "小百科",
-    drawingButton: "桂小灵在画",
+    drawingButton: "桂小雅在画",
     redrawButton: "换一张插图",
     drawButton: "补画这一页",
     waitingImage: "这页还在等插图",
-    drawingImage: "桂小灵正在画这一页……",
+    drawingImage: "桂小雅正在画这一页……",
     pageLabel: (pageNumber: number) => `第 ${pageNumber} 页`,
     imageAlt: (pageNumber: number) => `第 ${pageNumber} 页插图`
-  };
-}
-
-function getPlayerCopy(language: BookLanguage) {
-  if (language === "en") {
-    return {
-      back: "Back to Studio",
-      eyebrow: "Gui Xiaoling Picture Book Theater",
-      showCulture: "Show mini encyclopedia",
-      stop: "Pause",
-      readAll: "Read Full Book",
-      waitingImage: "This page is waiting for an illustration",
-      discovery: "Mini Encyclopedia",
-      previous: "Previous",
-      readPage: "Read This Page",
-      next: "Next",
-      noPagesTitle: "This picture book has no pages yet",
-      noPagesDetail: "Go back to the studio and rebuild the story."
-    };
-  }
-
-  return {
-    back: "返回书桌",
-    eyebrow: "桂小灵绘本剧场",
-    showCulture: "显示文化小百科",
-    stop: "停一下",
-    readAll: "朗读全书",
-    waitingImage: "这页插图还在等待绘制",
-    discovery: "小百科",
-    previous: "上一页",
-    readPage: "听这一页",
-    next: "下一页",
-    noPagesTitle: "这本绘本还没有页面",
-    noPagesDetail: "请回到创作书桌重新整理故事。"
   };
 }
 
@@ -1662,217 +1540,38 @@ function PostGenerateActions({ book, onDismiss }: { book: PictureBook; onDismiss
       <div>
         <p className="eyebrow">{language === "en" ? "Picture Book Ready" : "绘本已经准备好啦"}</p>
         <h3>{language === "en" ? "The storybook is bound" : "故事书已装订完成"}</h3>
-        <p>{language === "en" ? "Keep reading slowly, or open the theater view for live storytelling." : "可以继续慢慢读，也可以打开绘本剧场，适合比赛现场讲故事。"}</p>
+        <p>{language === "en" ? "Open the new detail page to read the finished picture book." : "进入新的绘本详情页，慢慢阅读故事、插图和小百科。"}</p>
       </div>
       <div>
         <button className="secondary-button" type="button" onClick={onDismiss}>
           <BookOpen size={18} />
-          {language === "en" ? "Keep Reading" : "继续看这本书"}
+          {language === "en" ? "Stay in Studio" : "留在书桌"}
         </button>
-        <a className="primary-button" href={getPlayerHref(book.id)} target="_blank" rel="noreferrer">
+        <a className="primary-button" href={getBookDetailHref(book.id)}>
           <ExternalLink size={18} />
-          {language === "en" ? "Open Storybook" : "打开故事书"}
+          {language === "en" ? "Read Picture Book" : "开始读绘本"}
         </a>
       </div>
     </section>
   );
 }
 
-function PictureBookPlayer({ book }: { book: PictureBook | null }) {
-  const [pageIndex, setPageIndex] = useState(0);
-  const [includeCultureNote, setIncludeCultureNote] = useState(true);
-  const [isAutoPlaying, setIsAutoPlaying] = useState(false);
-  const autoPlayRef = useRef(false);
-
-  useEffect(() => {
-    autoPlayRef.current = false;
-    setIsAutoPlaying(false);
-    stopBrowserSpeech();
-    setPageIndex(0);
-  }, [book?.id]);
-
-  useEffect(() => {
-    return () => {
-      autoPlayRef.current = false;
-      stopBrowserSpeech();
-    };
-  }, []);
-
-  if (!book) {
-    return (
-      <main className="player-shell">
-        <section className="player-loading">
-          <LoaderCircle className="loading-spinner" size={34} />
-          <h1>正在打开绘本剧场</h1>
-          <p>如果作品刚刚装订完成，请稍等片刻。</p>
-          <a className="secondary-button" href="#/">
-            <Home size={18} />
-            返回书桌
-          </a>
-        </section>
-      </main>
-    );
-  }
-
-  const currentBook = book;
+function BookReadyCard({ book }: { book: PictureBook }) {
   const language = book.language || "zh";
-  const copy = getPlayerCopy(language);
-  const pages = book.pages.length ? book.pages : [];
-  const page = pages[Math.min(pageIndex, Math.max(pages.length - 1, 0))];
-  const pageCount = pages.length;
-
-  async function playAllPages() {
-    if (!pages.length || isAutoPlaying) {
-      return;
-    }
-
-    autoPlayRef.current = true;
-    setIsAutoPlaying(true);
-    try {
-      await speakWithBrowser(cleanSpeechPart(displayBookText(currentBook.title, language)), language, {
-        shouldContinue: () => autoPlayRef.current,
-        protagonistGender: currentBook.protagonistGender || "girl"
-      });
-      for (const [index, item] of pages.entries()) {
-        if (!autoPlayRef.current) {
-          break;
-        }
-        setPageIndex(index);
-        await new Promise((resolve) => window.setTimeout(resolve, 260));
-        if (!autoPlayRef.current) {
-          break;
-        }
-        await speakWithBrowser(buildPageReadText(currentBook, item, includeCultureNote), language, {
-          audioUrl: includeCultureNote ? item.speechAudioUrl : undefined,
-          shouldContinue: () => autoPlayRef.current,
-          protagonistGender: currentBook.protagonistGender || "girl"
-        });
-        if (!autoPlayRef.current) {
-          break;
-        }
-        await new Promise((resolve) => window.setTimeout(resolve, 360));
-      }
-    } finally {
-      autoPlayRef.current = false;
-      setIsAutoPlaying(false);
-    }
-  }
-
-  function stopAutoPlay() {
-    autoPlayRef.current = false;
-    setIsAutoPlaying(false);
-    stopBrowserSpeech();
-  }
-
-  function readCurrentPage() {
-    autoPlayRef.current = false;
-    setIsAutoPlaying(false);
-    void speakWithBrowser(buildPageReadText(currentBook, page, includeCultureNote), language, {
-      audioUrl: includeCultureNote ? page.speechAudioUrl : undefined,
-      protagonistGender: currentBook.protagonistGender || "girl"
-    });
-  }
-
-  function goToPage(nextIndex: number) {
-    stopAutoPlay();
-    setPageIndex(Math.min(pageCount - 1, Math.max(0, nextIndex)));
-  }
-
   return (
-    <main className="player-shell">
-      <header className="player-header">
-        <a className="secondary-button player-back-button" href="#/">
-          <Home size={18} />
-          {copy.back}
+    <section className="post-generate-actions">
+      <div>
+        <p className="eyebrow">{language === "en" ? "Saved to Shelf" : "已放入我的书架"}</p>
+        <h3>{displayBookText(book.title, language)}</h3>
+        <p>{displayBookText(book.subtitle, language)}</p>
+      </div>
+      <div>
+        <a className="primary-button" href={getBookDetailHref(book.id)}>
+          <ExternalLink size={18} />
+          {language === "en" ? "Read Picture Book" : "开始读绘本"}
         </a>
-        <div>
-          <p className="eyebrow">{copy.eyebrow}</p>
-          <h1>{displayBookText(book.title, language)}</h1>
-          <p>{displayBookText(book.subtitle, language)}</p>
-        </div>
-        <div className="player-header-actions">
-          <label className="player-knowledge-toggle">
-            <input
-              type="checkbox"
-              checked={includeCultureNote}
-              onChange={(event) => setIncludeCultureNote(event.target.checked)}
-            />
-            {copy.showCulture}
-          </label>
-          <button className="primary-button player-read-button" type="button" onClick={isAutoPlaying ? stopAutoPlay : () => void playAllPages()}>
-            <Volume2 size={18} />
-            {isAutoPlaying ? copy.stop : copy.readAll}
-          </button>
-        </div>
-      </header>
-
-      {page ? (
-        <section className="player-stage">
-          <div className="player-image">
-            {page.imageUrl ? (
-              <img src={page.imageUrl} alt={`${displayBookText(book.title, language)} ${displayBookText(page.title, language)}`} />
-            ) : (
-              <div className="player-image-empty">
-                <Image size={46} />
-                <span>{copy.waitingImage}</span>
-              </div>
-            )}
-          </div>
-          <article className="player-copy">
-            <h2>{displayBookText(page.title, language)}</h2>
-            <p>{displayBookText(page.text, language)}</p>
-            {includeCultureNote ? (
-              <div className="player-culture-note">
-                <strong>{copy.discovery}</strong>
-                <span>{displayBookText(page.cultureNote, language)}</span>
-              </div>
-            ) : null}
-            <div className="player-controls">
-              <button className="secondary-button" type="button" onClick={() => goToPage(pageIndex - 1)} disabled={pageIndex === 0}>
-                <ChevronLeft size={18} />
-                {copy.previous}
-              </button>
-              <button className="secondary-button" type="button" onClick={readCurrentPage}>
-                <Volume2 size={18} />
-                {copy.readPage}
-              </button>
-              <button
-                className="secondary-button"
-                type="button"
-                onClick={() => goToPage(pageIndex + 1)}
-                disabled={pageIndex >= pageCount - 1}
-              >
-                {copy.next}
-                <ChevronRight size={18} />
-              </button>
-            </div>
-          </article>
-        </section>
-      ) : (
-        <section className="player-loading">
-          <Paintbrush size={38} />
-          <h1>{copy.noPagesTitle}</h1>
-          <p>{copy.noPagesDetail}</p>
-        </section>
-      )}
-
-      <nav className="player-page-dots" aria-label="绘本页码">
-        <div>
-          {pages.map((item, index) => (
-            <button
-              type="button"
-              className={index === pageIndex ? "active" : ""}
-              key={item.pageNumber}
-              onClick={() => setPageIndex(index)}
-              aria-label={language === "en" ? `Go to page ${index + 1}` : `翻到第 ${index + 1} 页`}
-              title={language === "en" ? `Page ${index + 1}` : `第 ${index + 1} 页`}
-            >
-              {index + 1}
-            </button>
-          ))}
-        </div>
-      </nav>
-    </main>
+      </div>
+    </section>
   );
 }
 
@@ -1882,7 +1581,7 @@ function BookView({
   imageTasks
 }: {
   book: PictureBook;
-  onGenerateImage: (pageNumber: number) => Promise<void>;
+  onGenerateImage: (pageNumber: number) => Promise<PictureBook>;
   imageTasks?: Record<number, ImageTaskStatus>;
 }) {
   const language = book.language || "zh";
@@ -1911,7 +1610,7 @@ function BookView({
               {displayBookText(item, language)}
             </span>
           ))}
-          <a className="player-inline-link" href={getPlayerHref(book.id)} target="_blank" rel="noreferrer">
+          <a className="player-inline-link" href={getBookDetailHref(book.id)}>
             <ExternalLink size={15} />
             {copy.readLink}
           </a>
@@ -1973,7 +1672,7 @@ function BookView({
                   <img src={page.imageUrl} alt={copy.imageAlt(page.pageNumber)} />
                 ) : (
                   <div className="image-waiting">
-                    {taskStatus === "running" ? <LoaderCircle size={34} /> : <Image size={34} />}
+                    {taskStatus === "running" ? <LoaderCircle size={34} /> : <ImageIcon size={34} />}
                     <span>{taskStatus === "running" ? copy.drawingImage : copy.waitingImage}</span>
                   </div>
                 )}

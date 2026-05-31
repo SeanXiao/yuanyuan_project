@@ -613,7 +613,7 @@ export function createFallbackBook(idea: string, language: BookLanguage = "zh", 
     studentReflection: "我发现文化亮点不是硬塞进故事里的标签，而是要从地点、人物和情节里自然长出来。",
     aiContentRatio: 88,
     promptRecords: [
-      makePromptRecord("story", "故事生成 Prompt", storyPrompt, "已生成 4 页绘本故事、大纲、文旅讲解和文化小百科。"),
+      makePromptRecord("story", "桂韵创想家 核心提示词", storyPrompt, "已生成 4 页绘本故事、大纲、文旅讲解和文化小百科。"),
       ...pages.map((page) => makePromptRecord("image", `第 ${page.pageNumber} 页图片 Prompt`, page.imagePrompt, "等待图片生成或使用本地演示插图。"))
     ]
   };

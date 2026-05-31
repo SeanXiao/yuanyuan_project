@@ -207,13 +207,19 @@ async function main() {
       const section = document.querySelector(".records-page");
       const text = document.body.innerText;
       const storyButtons = document.querySelectorAll(".record-story-button").length;
-      const promptGroups = document.querySelectorAll(".prompt-group").length;
-      return section ? { hash: location.hash, promptGroups, storyButtons, text } : null;
+      const recordTabs = document.querySelectorAll(".record-tab-button").length;
+      return section ? { hash: location.hash, recordTabs, storyButtons, text } : null;
     });
     assert(records.hash === "#/records", "records has top level route");
     assert(records.storyButtons > 1, "records page can choose different stories");
-    assert(records.promptGroups >= 3, "records page groups prompts");
-    assert(records.text.includes("核心创建故事提示词") && records.text.includes("各页故事与插图提示词"), "records page shows core and page prompts");
+    assert(records.recordTabs >= 5, "records page groups prompts in tabs");
+    assert(records.text.includes("核心创建故事提示词"), "records page shows core prompt tab by default");
+    await client.evaluate(() => {
+      [...document.querySelectorAll(".record-tab-button")].find((button) => button.textContent.includes("故事输出"))?.click();
+      return true;
+    });
+    await client.waitFor(() => document.body.innerText.includes("各页故事与插图提示词") && document.querySelectorAll(".record-page-tab").length >= 4);
+    pass("records story output tab works");
     const recordSelection = await client.evaluate(() => {
       const current = location.hash;
       const other = [...document.querySelectorAll(".record-story-button")].find((button) => !button.classList.contains("active"));
