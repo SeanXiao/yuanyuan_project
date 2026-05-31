@@ -111,7 +111,7 @@ export async function generateSeasonalInspirationChips(options: {
   const systemPrompt =
     language === "en"
       ? [
-          "You are Gui Xiaoling, an inspiration coach for elementary-school Guangxi picture books.",
+          "You are Gui Xiaoya, an inspiration coach for elementary-school Guangxi picture books.",
           "Create fresh one-sentence story idea chips for children ages 6-12.",
           "Use the current season or holiday as the emotional hook, then choose Guangxi travel scenes and cultural highlights that naturally fit.",
           "Avoid repeating famous symbols by default. Do not use Zhuang brocade or bronze drums unless the idea itself clearly needs them.",
@@ -123,7 +123,7 @@ export async function generateSeasonalInspirationChips(options: {
           "Output JSON only."
         ].join("\n")
       : [
-          "你是桂小灵，负责给小学组孩子设计广西绘本灵感锦囊。",
+          "你是桂小雅，负责给小学组孩子设计广西绘本灵感锦囊。",
           "请创作新鲜的一句话儿童小故事灵感，适合 6-12 岁孩子继续做绘本。",
           "先根据当前时令或节日找情绪钩子，再选择自然贴合的广西文旅场景和文化亮点。",
           "不要默认使用壮锦或铜鼓，除非灵感本身明确需要。",
@@ -204,35 +204,35 @@ function useGuiXiaolingName(value: unknown = "", language: BookLanguage = "zh") 
 
   if (language === "en") {
     return text
-      .replace(/\bAI\s+(assistant|helper|companion|robot)\b/giu, "Gui Xiaoling")
-      .replace(/\bthe\s+assistant\b/giu, "Gui Xiaoling")
-      .replace(/\bmy\s+assistant\b/giu, "Gui Xiaoling")
-      .replace(/\bXiaoyuan\b/giu, "Gui Xiaoling");
+      .replace(/\bAI\s+(assistant|helper|companion|robot)\b/giu, "Gui Xiaoya")
+      .replace(/\bthe\s+assistant\b/giu, "Gui Xiaoya")
+      .replace(/\bmy\s+assistant\b/giu, "Gui Xiaoya")
+      .replace(/\bXiaoyuan\b/giu, "Gui Xiaoya");
   }
 
   return text
-    .replace(/AI\s*伙伴(?=桂小灵)/gu, "")
-    .replace(/AI\s*伙伴/gu, "桂小灵")
-    .replace(/AI\s*小助手/gu, "桂小灵")
-    .replace(/AI\s*助手/gu, "桂小灵")
-    .replace(/智能小助手/gu, "桂小灵")
-    .replace(/小助手/gu, "桂小灵")
-    .replace(/小圆/gu, "桂小灵");
+    .replace(/AI\s*伙伴(?=桂小雅)/gu, "")
+    .replace(/AI\s*伙伴/gu, "桂小雅")
+    .replace(/AI\s*小助手/gu, "桂小雅")
+    .replace(/AI\s*助手/gu, "桂小雅")
+    .replace(/智能小助手/gu, "桂小雅")
+    .replace(/小助手/gu, "桂小雅")
+    .replace(/小圆/gu, "桂小雅");
 }
 
 function guiXiaolingVisualSpec(language: BookLanguage = "zh") {
   if (language === "en") {
     return [
-      "Gui Xiaoling visual lock: a cute glossy white-and-blue round robot mascot with a glowing cyan face and heart, headset microphone, friendly childlike smile, and soft toy-like proportions.",
+      "Gui Xiaoya visual lock: a cute glossy white-and-blue round robot mascot with a glowing cyan face and heart, headset microphone, friendly childlike smile, and soft toy-like proportions.",
       "Guangxi design details: indigo ethnic-inspired headscarf with teal, white, red, and gold geometric trim, small silver-inspired charm by the knot, blue cape, and subtle Guangxi ethnic pattern accents on the cuffs, cape, and notebook. Do not treat these costume details as mandatory story heritage themes.",
-      "In picture-book images, Gui Xiaoling must be the consistent companion robot character, not a generic AI assistant, human child, animal, or unrelated robot."
+      "In picture-book images, Gui Xiaoya must be the consistent companion robot character, not a generic AI assistant, human child, animal, or unrelated robot."
     ].join(" ");
   }
 
   return [
-    "桂小灵视觉锁定：可爱的白蓝配色圆润机器人吉祥物，黑色发光屏幕脸、青蓝色笑脸和爱心灯、耳麦、亲切儿童化表情，整体像柔和精致的 3D 玩具机器人。",
+    "桂小雅视觉锁定：可爱的白蓝配色圆润机器人吉祥物，黑色发光屏幕脸、青蓝色笑脸和爱心灯、耳麦、亲切儿童化表情，整体像柔和精致的 3D 玩具机器人。",
     "广西特色细节：靛蓝民族风格头巾，带青蓝、白、红、金色几何边纹，头巾结旁有轻巧银饰小挂件；蓝色披风、袖口/披风/本子有少量广西民族纹样点缀。不要把这些装饰当成故事必须出现的非遗主题。",
-    "绘本插图中，桂小灵必须作为固定的画册机器人伙伴出现，不要画成普通 AI 助手、人类小孩、动物或其他无关机器人。"
+    "绘本插图中，桂小雅必须作为固定的画册机器人伙伴出现，不要画成普通 AI 助手、人类小孩、动物或其他无关机器人。"
   ].join(" ");
 }
 
@@ -240,12 +240,12 @@ function protagonistVisualSpec(language: BookLanguage = "zh", gender: Protagonis
   if (language === "en") {
     return gender === "boy"
       ? "Student protagonist visual lock: one 8-10 year-old Guangxi elementary-school boy, bright eyes, friendly expression, simple red-blue jacket with subtle Guangxi ethnic pattern accents, small backpack."
-      : "Student protagonist visual lock: one 8-10 year-old Guangxi elementary-school girl, inspired by Xiaoyuxi as the default girl role, bright eyes, friendly expression, simple red-blue jacket with subtle Guangxi ethnic pattern accents, small backpack.";
+      : "Student protagonist visual lock: one 8-10 year-old Guangxi elementary-school girl, bright eyes, friendly expression, simple red-blue jacket with subtle Guangxi ethnic pattern accents, small backpack.";
   }
 
   return gender === "boy"
     ? "小学生主角视觉锁定：一位 8-10 岁广西小学生男孩，明亮眼睛、友好表情，穿红蓝相间、带少量广西民族纹样点缀的小外套，背一个小书包。"
-    : "小学生主角视觉锁定：一位 8-10 岁广西小学生女孩，默认以肖予曦女生角色为原型，明亮眼睛、友好表情，穿红蓝相间、带少量广西民族纹样点缀的小外套，背一个小书包。";
+    : "小学生主角视觉锁定：一位 8-10 岁广西小学生女孩，明亮眼睛、友好表情，穿红蓝相间、带少量广西民族纹样点缀的小外套，背一个小书包。";
 }
 
 function textFreeImageRule(language: BookLanguage = "zh") {
@@ -267,7 +267,7 @@ function textFreeImageRule(language: BookLanguage = "zh") {
 function withCharacterImagePrompt(prompt = "", language: BookLanguage = "zh", protagonistGender: ProtagonistGender = "girl") {
   const namedPrompt = useGuiXiaolingName(prompt, language);
   const protagonistMarker = language === "en" ? "Student protagonist visual lock" : "小学生主角视觉锁定";
-  const robotMarker = language === "en" ? "Gui Xiaoling visual lock" : "桂小灵视觉锁定";
+  const robotMarker = language === "en" ? "Gui Xiaoya visual lock" : "桂小雅视觉锁定";
   const textRuleMarker = language === "en" ? "No readable text rule" : "无文字画面规则";
   const promptParts = [namedPrompt];
 
@@ -518,7 +518,7 @@ function fallbackInspirationChips(language: BookLanguage, contextLabel: string, 
           : [
               "A shell-carving secret on Beihai Silver Beach",
               "A Dong grand song floating from Sanjiang Wind-Rain Bridge",
-              "A Li River mountain-song map with Gui Xiaoling",
+              "A Li River mountain-song map with Gui Xiaoya",
               "A Liuzhou food-market culture clue",
               "A Tianqin echo at Detian Waterfall",
               "A Longji Terrace farming story in the clouds",
@@ -568,7 +568,7 @@ function fallbackInspirationChips(language: BookLanguage, contextLabel: string, 
           : [
               "北海银滩上的贝雕秘密",
               "三江风雨桥飘来的侗族大歌",
-              "桂小灵和漓江上的山歌地图",
+              "桂小雅和漓江上的山歌地图",
               "柳州美食集市里的文化线索",
               "德天瀑布边的天琴回声",
               "龙脊梯田云朵里的农耕故事",
@@ -762,8 +762,8 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
           "Task: Turn a student's one-sentence idea into a Guangxi culture and travel AI picture book.",
           "Perspective: Write from the student's point of view, emphasizing 'I create together with AI'. Do not sound like an adult managing a child.",
           `Student protagonist: use ${protagonistGender === "boy" ? "a boy" : "a girl"} as the story's elementary-school protagonist. ${protagonistVisualSpec("en", protagonistGender)}`,
-          "Companion character: whenever the AI helper or robot helper appears in the story, its name must be Gui Xiaoling. Do not write generic names such as AI assistant, AI helper, assistant, or Xiaoyuan.",
-          "Gui Xiaoling is a robot companion. Describe its round mechanical hands, glowing screen face, and white-blue body; never give it furry hands, paws, animal fur, or plush-animal body parts.",
+          "Companion character: whenever the AI helper or robot helper appears in the story, its name must be Gui Xiaoya. Do not write generic names such as AI assistant, AI helper, assistant, or Xiaoyuan.",
+          "Gui Xiaoya is a robot companion. Describe its round mechanical hands, glowing screen face, and white-blue body; never give it furry hands, paws, animal fur, or plush-animal body parts.",
           "Content: Combine Guangxi travel scenes, local culture, nature, food, daily life, and creative-writing growth. Use intangible heritage only when it naturally fits the scene.",
           sceneFirstGuide,
           "Fidelity rule: Preserve the student's named place, activity, object, food, animal, and mood. If the idea mentions Sanniang Bay, dolphins, crabs, beach barbecue, or another concrete detail, those details must drive the plot and must not be replaced by another Guangxi place.",
@@ -779,8 +779,8 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
           "任务：根据学生的一句话灵感，生成广西文化文旅 AI 绘本。",
           "视角：必须使用学生视角，强调“我和 AI 一起创作”，不要写成成人管理孩子。",
           `小学生主角：故事主角必须是${protagonistGender === "boy" ? "男孩" : "女孩"}。${protagonistVisualSpec("zh", protagonistGender)}`,
-          "伙伴角色：如果故事里出现帮助我的 AI 或机器人助手，名字必须是“桂小灵”，不要写“AI小助手”“AI助手”“小助手”“小圆”。",
-          "桂小灵是机器人伙伴，可以描写圆圆的机械手、发光屏幕脸和白蓝机身；不要写毛茸茸的小手、爪子、动物绒毛或毛绒动物身体。",
+          "伙伴角色：如果故事里出现帮助我的 AI 或机器人助手，名字必须是“桂小雅”，不要写“AI小助手”“AI助手”“小助手”“小圆”。",
+          "桂小雅是机器人伙伴，可以描写圆圆的机械手、发光屏幕脸和白蓝机身；不要写毛茸茸的小手、爪子、动物绒毛或毛绒动物身体。",
           "内容：融合广西文旅场景、地方文化、自然风景、美食物产、日常生活和创编能力训练；只有自然贴合时才使用非遗。",
           sceneFirstGuide,
           "忠实原则：必须保留学生灵感里的具体地点、活动、物件、食物、动物和情绪。如果灵感写了三娘湾、海豚、螃蟹、海边烧烤等具体内容，这些内容必须推动故事，不能改写成百色、芒果园或其他无关广西地点。",
@@ -803,7 +803,7 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
           "language: exactly \"en\"",
           `protagonistGender: exactly "${protagonistGender}"`,
           `The elementary-school protagonist must be ${protagonistGender === "boy" ? "a boy" : "a girl"} throughout story text and image prompts.`,
-          "If a helper robot appears in the story, call it Gui Xiaoling every time.",
+          "If a helper robot appears in the story, call it Gui Xiaoya every time.",
           "heritageElements: 2-5 scene-matched Guangxi cultural highlights. They may be intangible heritage, local scenery, agriculture, food, ecology, architecture, city memory, or daily life. Prefer fewer accurate highlights over many famous but unrelated symbols.",
           "tourismElements: 2-5 Guangxi cultural tourism elements",
           "guidingQuestions: 2-3 questions that help the student continue creating, in English",
@@ -820,7 +820,7 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
           "Every image prompt must explicitly forbid readable text: no Chinese characters, English letters, pinyin, numbers, captions, dialogue bubbles, labels, signs, plaques, banners, page numbers, subtitles, watermarks, logos, UI, book text, paper notes, museum panels, monuments, or inscriptions. If a sign, plaque, book, paper, banner, monument, or display board appears, render it blank or unreadable.",
           "Image prompts must not ask the image model to draw story paragraphs, page titles, explanations, labels, or cultural notes inside the picture.",
           `Image prompts must keep this student protagonist visual: ${protagonistVisualSpec("en", protagonistGender)}`,
-          `Image prompts must use this exact companion role when Gui Xiaoling appears: ${guiXiaolingVisualSpec("en")}`,
+          `Image prompts must use this exact companion role when Gui Xiaoya appears: ${guiXiaolingVisualSpec("en")}`,
           "The 4 image prompts must keep the same elementary-school protagonist, same outfit, same visual style, and continuous story mood. Only the scene and action change per page."
         ].join("\n")
       : [
@@ -832,7 +832,7 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
           "language: 固定为 \"zh\"",
           `protagonistGender: 固定为 "${protagonistGender}"`,
           `故事正文和图片 Prompt 中的小学生主角必须始终是${protagonistGender === "boy" ? "男孩" : "女孩"}。`,
-          "如果故事里出现帮助我的机器人或 AI 伙伴，请每次都称呼它为“桂小灵”。",
+          "如果故事里出现帮助我的机器人或 AI 伙伴，请每次都称呼它为“桂小雅”。",
           "heritageElements: 2-5 个与场景贴合的广西文化亮点。可以是非遗，也可以是地方风景、物产农耕、美食、生态、建筑、城市记忆或日常生活。宁可少而准确，不要堆砌知名但无关的符号。",
           "tourismElements: 2-5 个广西文旅元素",
           "guidingQuestions: 2-3 个用于启发学生继续创编的问题",
@@ -1045,9 +1045,9 @@ function buildCoherentImagePrompt(book: PictureBook, page: PictureBookPage) {
     "请生成一张高质量儿童绘本插图，必须与同一本绘本的其他页保持连贯。",
     "画面格式硬性要求：只生成当前页的一张完整单幅插图。不要四宫格、不要漫画分镜、不要拼贴、多窗格、多张小图或缩略图合集。",
     "内容范围硬性要求：画面只表现当前页故事的一个关键瞬间，不要把第1页、第2页、第3页、第4页同时画在同一张图里。",
-    "角色数量硬性要求：画面中只出现一位小学生主角和一个桂小灵机器人，不要重复主角，不要重复桂小灵，不要出现第二个相同小朋友。",
+    "角色数量硬性要求：画面中只出现一位小学生主角和一个桂小雅机器人，不要重复主角，不要重复桂小雅，不要出现第二个相同小朋友。",
     `统一视觉设定：同一位小学生主角贯穿四页。${protagonistVisualSpec(book.language || "zh", protagonistGender)}`,
-    `统一伙伴角色设定：每页都让桂小灵作为画册机器人小伙伴自然出现在画面中。${guiXiaolingVisualSpec(book.language || "zh")}`,
+    `统一伙伴角色设定：每页都让桂小雅作为画册机器人小伙伴自然出现在画面中。${guiXiaolingVisualSpec(book.language || "zh")}`,
     "统一画风：温暖明亮的儿童绘本插画，细腻水彩质感，柔和光线，广西民族纹样可以作为小面积装饰，画面适合小学组展示。",
     "文化呈现原则：只画当前页视觉提示和文化元素里自然出现的内容；有非遗就自然表现，没有非遗就表现风景、物产、农耕、城市生活等有意义内容，不要为了广西感额外加入壮锦、铜鼓或其他无关符号。",
     textFreeImageRule(book.language || "zh"),
@@ -1060,7 +1060,7 @@ function buildCoherentImagePrompt(book: PictureBook, page: PictureBookPage) {
     `全书页码仅供角色一致性参考，不要画成分镜：${context}`,
     `当前只绘制第 ${page.pageNumber} 页对应的单个故事画面，不要在画面里写页标题或页码。`,
     "当前页视觉提示，只能当作画面构图参考，不得把其中任何词语画成文字：",
-    pageVisualPrompt || "小学生主角和桂小灵在广西场景中观察、体验和创作，画面表现一个清楚动作和一个地方文化细节。",
+    pageVisualPrompt || "小学生主角和桂小雅在广西场景中观察、体验和创作，画面表现一个清楚动作和一个地方文化细节。",
     "最终自检：整张图中不得出现任何可读字符，包括中文、拼音、英文、数字和标点。"
   ].join("\n");
 }

@@ -110,7 +110,7 @@ const cultureNotes: Record<string, string> = {
 };
 
 const englishNameMap: Record<string, string> = {
-  桂小灵: "Gui Xiaoling",
+  桂小雅: "Gui Xiaoya",
   "是广西文化元素，适合和相关地点、人物或行动自然连在一起。": " is a Guangxi local highlight. Use it when it naturally connects with the place, characters, or action.",
   "是广西文化元素": " is a Guangxi local highlight",
   广西: "Guangxi",
@@ -343,13 +343,13 @@ export function buildSceneFirstHeritageGuide(idea: string, language: BookLanguag
 function guiXiaolingVisualSpec(language: BookLanguage) {
   if (language === "en") {
     return [
-      "Gui Xiaoling visual lock: Gui Xiaoling is the picture-book companion robot, a cute glossy white-and-blue round robot mascot with a glowing cyan face and heart, headset microphone, friendly childlike smile, blue cape, and toy-like proportions.",
+      "Gui Xiaoya visual lock: Gui Xiaoya is the picture-book companion robot, a cute glossy white-and-blue round robot mascot with a glowing cyan face and heart, headset microphone, friendly childlike smile, blue cape, and toy-like proportions.",
       "Guangxi details: indigo ethnic-inspired headscarf with teal, white, red, and gold geometric trim, small silver-inspired charm, and subtle Guangxi ethnic pattern accents on the cuffs, cape, and notebook. Do not treat these costume details as mandatory story heritage themes."
     ].join(" ");
   }
 
   return [
-    "桂小灵视觉锁定：桂小灵是画册里的固定机器人伙伴，可爱的白蓝配色圆润机器人吉祥物，黑色发光屏幕脸、青蓝色笑脸和爱心灯、耳麦、蓝色披风，整体像柔和精致的玩具机器人。",
+    "桂小雅视觉锁定：桂小雅是画册里的固定机器人伙伴，可爱的白蓝配色圆润机器人吉祥物，黑色发光屏幕脸、青蓝色笑脸和爱心灯、耳麦、蓝色披风，整体像柔和精致的玩具机器人。",
     "广西特色细节：靛蓝民族风格头巾，带青蓝、白、红、金色几何边纹，头巾结旁有轻巧银饰小挂件；袖口、披风和本子有少量广西民族纹样点缀。不要把这些装饰当成故事必须出现的非遗主题。"
   ].join(" ");
 }
@@ -358,12 +358,12 @@ function protagonistVisualSpec(language: BookLanguage, gender: ProtagonistGender
   if (language === "en") {
     return gender === "boy"
       ? "Student protagonist: one 8-10 year-old Guangxi elementary-school boy, bright eyes, friendly expression, simple red-blue jacket with subtle Guangxi ethnic pattern accents, small backpack."
-      : "Student protagonist: one 8-10 year-old Guangxi elementary-school girl, inspired by Xiaoyuxi as the default girl role, bright eyes, friendly expression, simple red-blue jacket with subtle Guangxi ethnic pattern accents, small backpack.";
+      : "Student protagonist: one 8-10 year-old Guangxi elementary-school girl, bright eyes, friendly expression, simple red-blue jacket with subtle Guangxi ethnic pattern accents, small backpack.";
   }
 
   return gender === "boy"
     ? "小学生主角设定：一位 8-10 岁广西小学生男孩，明亮眼睛、友好表情，穿红蓝相间、带少量广西民族纹样点缀的小外套，背一个小书包。"
-    : "小学生主角设定：一位 8-10 岁广西小学生女孩，默认以肖予曦女生角色为原型，明亮眼睛、友好表情，穿红蓝相间、带少量广西民族纹样点缀的小外套，背一个小书包。";
+    : "小学生主角设定：一位 8-10 岁广西小学生女孩，明亮眼睛、友好表情，穿红蓝相间、带少量广西民族纹样点缀的小外套，背一个小书包。";
 }
 
 function makeIllustrationPrompt(
@@ -391,7 +391,7 @@ function makeIllustrationPrompt(
       protagonistVisualSpec(language, protagonistGender),
       guiXiaolingVisualSpec(language),
       "Visual concept: one child-friendly Guangxi picture-book scene, not a written title.",
-      "Show one clear action with the student protagonist and Gui Xiaoling in a Guangxi scene. Do not render story paragraphs, encyclopedia notes, captions, signs, or labels.",
+      "Show one clear action with the student protagonist and Gui Xiaoya in a Guangxi scene. Do not render story paragraphs, encyclopedia notes, captions, signs, or labels.",
       `Guangxi cultural highlights: ${heritage.join(", ")}.`,
       `Guangxi cultural tourism elements: ${tourism.join(", ")}.`,
       "Layered composition, friendly expressions, Guangxi ethnic patterns, landscape and festival atmosphere, no real-person portrait.",
@@ -404,7 +404,7 @@ function makeIllustrationPrompt(
     protagonistVisualSpec(language, protagonistGender),
     guiXiaolingVisualSpec(language),
     "本页视觉概念：一个适合儿童绘本的广西场景，不提供可写进画面的标题。",
-    "只画小学生主角和桂小灵在广西场景中的一个清楚动作，不要渲染故事正文、小百科、字幕、招牌或标签。",
+    "只画小学生主角和桂小雅在广西场景中的一个清楚动作，不要渲染故事正文、小百科、字幕、招牌或标签。",
       `广西文化亮点：${heritage.join("、")}。`,
     `广西文旅元素：${tourism.join("、")}。`,
     "画面有层次，角色表情友好，保留广西民族纹样、山水和节庆氛围，不要出现真实人物肖像。",
@@ -482,22 +482,22 @@ function makeChineseFallbackPages(
       {
         title: "海风把灵感吹来",
         text:
-          "周末，我背着小桶和画本来到钦州三娘湾。海风咸咸的，沙滩上有一串串小脚印。桂小灵提醒我先观察潮水，再靠近浅浅的沙地。我把想钓螃蟹、看海豚、吃海边烧烤的愿望写在第一页，故事就从浪花声里开始了。"
+          "周末，我背着小桶和画本来到钦州三娘湾。海风咸咸的，沙滩上有一串串小脚印。桂小雅提醒我先观察潮水，再靠近浅浅的沙地。我把想钓螃蟹、看海豚、吃海边烧烤的愿望写在第一页，故事就从浪花声里开始了。"
       },
       {
         title: "小螃蟹的沙洞",
         text:
-          "退潮后，我蹲在湿湿的沙地旁，看见一个圆圆的小洞。桂小灵把镜头放低，屏幕上出现小螃蟹探头的样子。我没有用力去抓它，只把它画进本子里，还记下蟹洞、贝壳和海草的位置。原来赶海最重要的不是带走多少东西，而是学会慢慢观察。"
+          "退潮后，我蹲在湿湿的沙地旁，看见一个圆圆的小洞。桂小雅把镜头放低，屏幕上出现小螃蟹探头的样子。我没有用力去抓它，只把它画进本子里，还记下蟹洞、贝壳和海草的位置。原来赶海最重要的不是带走多少东西，而是学会慢慢观察。"
       },
       {
         title: "海面上的白色弧线",
         text:
-          "下午，远处海面忽然亮起一道白色弧线，像浪花跳了起来。岸边的叔叔告诉我们，三娘湾常让人想起中华白海豚，大家看海豚时要安静，不追赶、不喂食，也不把垃圾留在沙滩上。我和桂小灵把这一刻画成一张会发光的海湾明信片。"
+          "下午，远处海面忽然亮起一道白色弧线，像浪花跳了起来。岸边的叔叔告诉我，三娘湾常让人想起中华白海豚，看海豚时要安静，不追赶、不喂食，也不把垃圾留在沙滩上。我和桂小雅把这一刻画成一张会发光的海湾明信片。"
       },
       {
         title: "烧烤香里的小导游词",
         text:
-          "傍晚，海边飘来玉米和烤虾的香味，我一边吃晚饭，一边把今天的发现讲给家人听：三娘湾有海风、蟹洞、渔船，也有需要我们保护的海豚朋友。桂小灵帮我把这些话整理成绘本。我想把这本书带回班里，邀请同学们一起温柔地认识大海。"
+          "傍晚，海边飘来玉米和烤虾的香味，我一边吃晚饭，一边把今天的发现讲给家人听：三娘湾有海风、蟹洞、渔船，也有需要人们保护的海豚朋友。桂小雅帮我把这些话整理成绘本。我想把这本书带回班里，邀请同学们一起温柔地认识大海。"
       }
     ];
   }
@@ -505,15 +505,15 @@ function makeChineseFallbackPages(
   return [
     {
       title: "灵感发光",
-      text: `我把自己的灵感说给桂小灵听，${heritage[0]}成了第一条线索，因为它和这个地点、人物、心情最合拍。桂小灵没有急着把故事写完，而是先问我看见了什么、听见了什么、最想让同学记住哪一个广西细节。`
+      text: `我把自己的灵感说给桂小雅听，${heritage[0]}成了第一条线索，因为它和这个地点、人物、心情最合拍。桂小雅没有急着把故事写完，而是先问我看见了什么、听见了什么、最想让同学记住哪一个广西细节。`
     },
     {
       title: "走进广西",
-      text: `我们来到了${tourism[0]}，这里的声音、颜色和人们的生活，自然而然把我们带向${heritage[1]}。我一边走一边观察，把路边的风景、空气里的味道和当地人的动作都记下来，让故事不只是介绍，而像一次真正的旅行。`
+      text: `我来到了${tourism[0]}，这里的声音、颜色和人们的生活，自然而然把我带向${heritage[1]}。我一边走一边观察，把路边的风景、空气里的味道和当地人的动作都记下来，让故事不只是介绍，而像一次真正的旅行。`
     },
     {
       title: "小小讲解员",
-      text: `路上，我遇到一个想了解广西文化的小伙伴。我用桂小灵帮我整理的词语，向他介绍${heritage[0]}和${heritage[2]}。我发现，讲文化不是背答案，而是把自己亲眼看到、亲耳听到的发现说清楚。`
+      text: `路上，我遇到一个想了解广西文化的小伙伴。我用桂小雅帮我整理的词语，向他介绍${heritage[0]}和${heritage[2]}。我发现，讲文化不是背答案，而是把自己亲眼看到、亲耳听到的发现说清楚。`
     },
     {
       title: "我的创编绘本",
@@ -532,9 +532,9 @@ export function createFallbackBook(idea: string, language: BookLanguage = "zh", 
   if (language === "en") {
     const title = makeFallbackTitle(idea, language);
     const pageTexts = [
-      `I shared my idea with Gui Xiaoling, and ${heritage[0]} became the first clue because it matched the place and mood of my story.`,
-      `We arrived at ${tourism[0]}. The sounds, colors, and people there naturally led us to ${heritage[1]}, so the journey felt truly local.`,
-      `On the road, I met a friend who wanted to know Guangxi better. With Gui Xiaoling's help, I introduced ${heritage[0]} and ${heritage[2]} in my own words.`,
+      `I shared my idea with Gui Xiaoya, and ${heritage[0]} became the first clue because it matched the place and mood of my story.`,
+      `I arrived at ${tourism[0]}. The sounds, colors, and people there naturally led me to ${heritage[1]}, so the journey felt truly local.`,
+      `On the road, I met a friend who wanted to know Guangxi better. With Gui Xiaoya's help, I introduced ${heritage[0]} and ${heritage[2]} in my own words.`,
       `At the end, I turned the journey into a picture book and shared ${tourism[1]} with classmates, letting each local highlight appear only where it belonged.`
     ];
     const titles = ["A Bright Idea", "Into Guangxi", "Little Culture Guide", "My Picture Book"];

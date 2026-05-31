@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "concurrently -n web,api -c cyan,green \"vite --host 127.0.0.1 --port 5173\" \"tsx watch server/index.ts\"",
     "build": "tsc && vite build",
+    "test:product-full-flow": "node scripts/product-shelf-full-flow.mjs",
+    "test:product-smoke": "node scripts/product-shelf-smoke.mjs",
     "preview": "vite preview --host 127.0.0.1 --port 4173",
     "api": "tsx server/index.ts"
   },
