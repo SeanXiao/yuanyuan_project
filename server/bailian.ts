@@ -1,6 +1,7 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import sharp from "sharp";
 import {
   makePromptRecord,
   nowIso,
@@ -32,6 +33,9 @@ type InspirationChipResponse = {
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const generatedDir = join(rootDir, "data", "generated");
+const fallbackGeneratedImageMaxBytes = 2 * 1024 * 1024;
+const fallbackGeneratedImageMaxSide = 1024;
+const fallbackGeneratedImageJpegQuality = 86;
 
 function dashScopeKey() {
   return process.env.DASHSCOPE_API_KEY?.trim() || process.env.BAILIAN_API_KEY?.trim() || "";
@@ -71,7 +75,23 @@ function imageModel() {
 }
 
 function imageSize() {
-  return process.env.BAILIAN_IMAGE_SIZE || "2K";
+  return process.env.BAILIAN_IMAGE_SIZE || "1K";
+}
+
+function generatedImageMaxBytes() {
+  return numberFromEnv("GENERATED_IMAGE_MAX_BYTES", fallbackGeneratedImageMaxBytes);
+}
+
+function generatedImageMaxSide() {
+  return numberFromEnv("GENERATED_IMAGE_MAX_SIDE", fallbackGeneratedImageMaxSide);
+}
+
+function clampNumber(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function generatedImageJpegQuality() {
+  return clampNumber(numberFromEnv("GENERATED_IMAGE_JPEG_QUALITY", fallbackGeneratedImageJpegQuality), 60, 92);
 }
 
 export function hasBailianKey() {
@@ -808,12 +828,45 @@ function normalizeDraft(idea: string, draft: BookDraft, language: BookLanguage, 
   };
 }
 
+function getCoreStoryPromptLabel(language: BookLanguage) {
+  return language === "en" ? "Core Story Creation Prompt" : "核心创建故事提示词";
+}
+
+function buildCoreStoryPromptRecord(idea: string, systemPrompt: string, userPrompt: string, language: BookLanguage) {
+  const brief =
+    language === "en"
+      ? `Turn the student's idea "${idea}" into a 4-page Guangxi culture and travel picture book; introduce heritage only when it naturally fits.`
+      : `请把小学生灵感“${idea}”创编成 4 页广西文化文旅绘本；有自然贴合的非遗就介绍，没有就介绍有意义的地方亮点。`;
+  return `${brief}\n\n########\n\n${systemPrompt}\n\n${userPrompt}`;
+}
+
+function promptOutputFromBook(book: PictureBook) {
+  const { id, createdAt, updatedAt, promptRecords, ...draft } = book;
+  void id;
+  void createdAt;
+  void updatedAt;
+  void promptRecords;
+  return JSON.stringify(draft, null, 2);
+}
+
+function withCoreStoryPromptRecord(book: PictureBook, prompt: string, output: string, language: BookLanguage) {
+  return {
+    ...book,
+    promptRecords: book.promptRecords.map((record) =>
+      record.type === "story"
+        ? {
+            ...record,
+            label: getCoreStoryPromptLabel(language),
+            prompt,
+            output
+          }
+        : record
+    )
+  };
+}
+
 export async function createPictureBookDraft(idea: string, language: BookLanguage = "zh", protagonistGender: ProtagonistGender = "girl") {
   const fallback = createFallbackBook(idea, language, protagonistGender);
-  if (!hasBailianKey()) {
-    return fallback;
-  }
-
   const sceneFirstGuide = buildSceneFirstHeritageGuide(idea, language);
   const systemPrompt =
     language === "en"
@@ -914,6 +967,11 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
           `图片提示词必须使用这个画册机器人角色设定：${guiXiaolingVisualSpec("zh")}`,
           "4 页图片提示词必须保持同一位小学生主角、同一套服装、同一绘本画风和连续故事氛围，只改变每页场景与动作。"
         ].join("\n");
+  const coreStoryPrompt = buildCoreStoryPromptRecord(idea, systemPrompt, userPrompt, language);
+
+  if (!hasBailianKey()) {
+    return withCoreStoryPromptRecord(fallback, coreStoryPrompt, promptOutputFromBook(fallback), language);
+  }
 
   try {
     const content = await chatCompletion([
@@ -939,8 +997,8 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
       promptRecords: [
         makePromptRecord(
           "story",
-          language === "en" ? "Guiyun Creator Core Prompt" : "桂韵创想家 核心提示词",
-          `${systemPrompt}\n\n${userPrompt}`,
+          getCoreStoryPromptLabel(language),
+          coreStoryPrompt,
           JSON.stringify(normalized, null, 2)
         ),
         ...normalized.pages.map((page) =>
@@ -955,8 +1013,9 @@ export async function createPictureBookDraft(idea: string, language: BookLanguag
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "百炼文本生成失败";
-    fallback.promptRecords.unshift(makePromptRecord("system", "百炼文本生成失败，使用本地演示数据", userPrompt, message));
-    return fallback;
+    const fallbackWithCorePrompt = withCoreStoryPromptRecord(fallback, coreStoryPrompt, promptOutputFromBook(fallback), language);
+    fallbackWithCorePrompt.promptRecords.unshift(makePromptRecord("system", "百炼文本生成失败，使用本地演示数据", coreStoryPrompt, message));
+    return fallbackWithCorePrompt;
   }
 }
 
@@ -1014,17 +1073,51 @@ async function createPlaceholderImage(book: PictureBook, page: PictureBookPage) 
   return `/generated/${fileName}`;
 }
 
+async function removePreviousGeneratedPageImages(bookId: string, pageNumber: number) {
+  await Promise.all(
+    ["png", "jpg", "jpeg", "webp"].map((ext) =>
+      rm(join(generatedDir, `${bookId}-page-${pageNumber}.${ext}`), { force: true })
+    )
+  );
+}
+
+async function optimizeGeneratedImage(bytes: Buffer) {
+  const maxBytes = generatedImageMaxBytes();
+  const maxSide = Math.max(512, Math.round(generatedImageMaxSide()));
+  const minSide = Math.min(768, maxSide);
+  let quality = generatedImageJpegQuality();
+  let side = maxSide;
+
+  while (true) {
+    const output = await sharp(bytes)
+      .rotate()
+      .resize({ width: side, height: side, fit: "inside", withoutEnlargement: true })
+      .flatten({ background: "#fff" })
+      .jpeg({ quality, mozjpeg: true })
+      .toBuffer();
+
+    if (output.length <= maxBytes || (quality <= 68 && side <= minSide)) {
+      return output;
+    }
+    if (quality > 68) {
+      quality -= 6;
+    } else {
+      side = Math.max(minSide, Math.round(side * 0.85));
+    }
+  }
+}
+
 async function downloadGeneratedImage(url: string, bookId: string, pageNumber: number) {
   await mkdir(generatedDir, { recursive: true });
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`Image download failed with HTTP ${response.status}`);
   }
-  const contentType = response.headers.get("content-type") || "image/png";
-  const ext = contentType.includes("jpeg") || contentType.includes("jpg") ? "jpg" : "png";
   const bytes = Buffer.from(await response.arrayBuffer());
-  const fileName = `${bookId}-page-${pageNumber}.${ext}`;
-  await writeFile(join(generatedDir, fileName), bytes);
+  const optimizedBytes = await optimizeGeneratedImage(bytes);
+  const fileName = `${bookId}-page-${pageNumber}.jpg`;
+  await removePreviousGeneratedPageImages(bookId, pageNumber);
+  await writeFile(join(generatedDir, fileName), optimizedBytes);
   return `/generated/${fileName}`;
 }
 
