@@ -866,7 +866,6 @@ export default function ProductShelfApp() {
         <div className="bookshelf-panel">
           <div className="product-section-head">
             <div>
-              <p className="product-eyebrow">默认进入</p>
               <h2>{bookshelfTitle}</h2>
               <span>{books.length ? `已保存 ${books.length} 本作品，最近更新：${latestBook ? formatShelfDate(latestBook.updatedAt) : "暂无"}` : "还没有作品，先新建第一本绘本。"}</span>
             </div>
@@ -874,10 +873,6 @@ export default function ProductShelfApp() {
               <button className="soft-button" type="button" onClick={() => void refreshBooks()}>
                 <RefreshCw size={17} />
                 刷新
-              </button>
-              <button className="strong-button" type="button" onClick={startNewBook}>
-                <Plus size={17} />
-                新建绘本
               </button>
             </div>
           </div>
@@ -1015,7 +1010,7 @@ const aboutBusinessCards = [
   {
     icon: Lightbulb,
     title: "我们为什么想做",
-    text: "肖予曦、温彼得、韦依辰喜欢故事、绘画和家乡文化，也想练习表达能力，所以想做一个能把一句灵感变成绘本的 AI 创作伙伴。"
+    text: "我们喜欢故事、绘画和家乡文化，也想练习表达能力，所以想做一个能把一句灵感变成绘本的 AI 创作伙伴。"
   },
   {
     icon: Compass,
