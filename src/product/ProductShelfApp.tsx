@@ -1056,7 +1056,7 @@ function ProjectAboutPage({ onStartCreate, onGoToShelf }: { onStartCreate: () =>
       <div className="about-hero">
         <div className="about-hero-copy">
           <p className="product-eyebrow">项目介绍</p>
-          <h2>肖予曦、温彼得、韦依辰和 AI 一起做出的“桂韵创想家”</h2>
+          <h2>温彼得、韦依辰、肖予曦和 AI 一起做出的“桂韵创想家”</h2>
           <p>
             我们做这个项目，是想让小朋友从一句自己的灵感出发，在 AI 的陪伴下完成故事构思、广西文化选择、绘本分镜、插图生成、朗读展示和作品保存。它强调的不是“AI 替我们写完”，而是“我们提出想法，AI 引导我们思考，我们一起把想法做成作品”。
           </p>
