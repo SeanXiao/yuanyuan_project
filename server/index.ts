@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express from "express";
+import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -33,7 +34,10 @@ import {
 
 const app = express();
 const port = Number(process.env.PORT || 8787);
+const host = process.env.HOST || "127.0.0.1";
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
+const clientDistDir = join(rootDir, "dist");
+const clientIndexPath = join(clientDistDir, "index.html");
 
 app.use(express.json({ limit: "1mb" }));
 app.use("/generated", express.static(join(rootDir, "data", "generated")));
@@ -391,11 +395,32 @@ app.post("/api/chat", async (request, response, next) => {
   }
 });
 
+app.use(express.static(clientDistDir));
+
+app.use((request, response, next) => {
+  if (request.path === "/api" || request.path.startsWith("/api/")) {
+    response.status(404).json({ error: "API route not found" });
+    return;
+  }
+
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    next();
+    return;
+  }
+
+  if (!existsSync(clientIndexPath)) {
+    response.status(503).send("Frontend build not found. Run npm run build before starting the server.");
+    return;
+  }
+
+  response.sendFile(clientIndexPath);
+});
+
 app.use((error: unknown, _request: express.Request, response: express.Response, _next: express.NextFunction) => {
   const message = error instanceof Error ? error.message : "Unknown server error";
   response.status(500).json({ error: message });
 });
 
-app.listen(port, "127.0.0.1", () => {
-  console.log(`API server listening on http://127.0.0.1:${port}`);
+app.listen(port, host, () => {
+  console.log(`Server listening on http://${host}:${port}`);
 });
